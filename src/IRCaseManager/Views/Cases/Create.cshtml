@@ -42,6 +42,14 @@
                 <span asp-validation-for="AssignedTeam"></span>
             </div>
 
+            <div class="field">
+                <label asp-for="AssignedUserId"></label>
+                <select asp-for="AssignedUserId" asp-items="ViewBag.AssignedUserOptions">
+                    <option value="">No owner selected</option>
+                </select>
+                <span asp-validation-for="AssignedUserId"></span>
+            </div>
+
             <div class="field field-wide">
                 <label asp-for="InitialSummary"></label>
                 <textarea asp-for="InitialSummary" maxlength="4000" rows="8"></textarea>

@@ -24,6 +24,9 @@ public class CreateCaseViewModel : IValidatableObject
     [Display(Name = "Assigned team")]
     public string AssignedTeam { get; set; } = string.Empty;
 
+    [Display(Name = "Assigned user / owner")]
+    public int? AssignedUserId { get; set; }
+
     [Required, StringLength(4000, MinimumLength = 10)]
     [Display(Name = "Initial summary")]
     public string InitialSummary { get; set; } = string.Empty;

@@ -6,6 +6,7 @@ using IRCaseManager.Services;
 using IRCaseManager.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace IRCaseManager.Controllers;
@@ -27,10 +28,36 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
         return View(cases);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> Details(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return NotFound();
+        }
+
+        var irCase = await db.Cases
+            .AsNoTracking()
+            .Include(caseRecord => caseRecord.CreatedBy)
+            .Include(caseRecord => caseRecord.Assignments)
+                .ThenInclude(assignment => assignment.ApplicationUser)
+            .Include(caseRecord => caseRecord.EvidenceItems)
+            .Include(caseRecord => caseRecord.TimelineEntries)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+
+        if (irCase is null)
+        {
+            return NotFound();
+        }
+
+        return View(irCase);
+    }
+
     [Authorize(Policy = AuthorizationPolicies.CanCreateCases)]
     [HttpGet]
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
+        await PopulateAssignedUserOptionsAsync();
         return View(new CreateCaseViewModel());
     }
 
@@ -42,6 +69,7 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
 
         if (!ModelState.IsValid)
         {
+            await PopulateAssignedUserOptionsAsync();
             return View(model);
         }
 
@@ -49,6 +77,19 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
         if (userId is null)
         {
             return Challenge();
+        }
+
+        if (model.AssignedUserId is not null)
+        {
+            var assignedUserExists = await db.Users.AnyAsync(applicationUser =>
+                applicationUser.Id == model.AssignedUserId.Value && applicationUser.IsActive);
+
+            if (!assignedUserExists)
+            {
+                ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid active user.");
+                await PopulateAssignedUserOptionsAsync();
+                return View(model);
+            }
         }
 
         var openedAt = DateTimeOffset.UtcNow;
@@ -69,6 +110,18 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
         };
 
         db.Cases.Add(irCase);
+
+        if (model.AssignedUserId is not null)
+        {
+            db.CaseAssignments.Add(new CaseAssignment
+            {
+                Case = irCase,
+                ApplicationUserId = model.AssignedUserId.Value,
+                AssignedById = userId.Value,
+                AssignedAt = openedAt
+            });
+        }
+
         db.AuditLogs.Add(new AuditLog
         {
             ApplicationUserId = userId,
@@ -80,6 +133,22 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
 
         await db.SaveChangesAsync();
         TempData["StatusMessage"] = $"Created {irCase.CaseId}.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
+    private async Task PopulateAssignedUserOptionsAsync()
+    {
+        var users = await db.Users
+            .AsNoTracking()
+            .Where(applicationUser => applicationUser.IsActive)
+            .OrderBy(applicationUser => applicationUser.UserName)
+            .Select(applicationUser => new SelectListItem
+            {
+                Value = applicationUser.Id.ToString(),
+                Text = applicationUser.UserName
+            })
+            .ToListAsync();
+
+        ViewBag.AssignedUserOptions = users;
     }
 }

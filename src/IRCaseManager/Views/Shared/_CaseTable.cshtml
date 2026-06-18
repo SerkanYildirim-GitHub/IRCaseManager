@@ -17,8 +17,16 @@
             @foreach (var irCase in Model)
             {
                 <tr>
-                    <td><strong>@irCase.CaseId</strong></td>
-                    <td>@irCase.Title</td>
+                    <td>
+                        <a class="case-link" asp-controller="Cases" asp-action="Details" asp-route-id="@irCase.CaseId">
+                            <strong>@irCase.CaseId</strong>
+                        </a>
+                    </td>
+                    <td>
+                        <a class="case-link" asp-controller="Cases" asp-action="Details" asp-route-id="@irCase.CaseId">
+                            @irCase.Title
+                        </a>
+                    </td>
                     <td><span class="badge severity-@irCase.Severity.ToString().ToLowerInvariant()">@irCase.Severity</span></td>
                     <td><span class="badge status-@irCase.Status.ToString().ToLowerInvariant()">@irCase.Status</span></td>
                     <td>@irCase.CaseType.GetDisplayName()</td>

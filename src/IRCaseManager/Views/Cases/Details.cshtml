@@ -1,0 +1,118 @@
+@model Case
+@{
+    ViewData["Title"] = Model.CaseId;
+    var assignedUsers = Model.Assignments
+        .Where(assignment => assignment.ApplicationUser is not null)
+        .Select(assignment => assignment.ApplicationUser!.UserName)
+        .OrderBy(userName => userName)
+        .ToList();
+}
+
+<section class="case-heading">
+    <div>
+        <p class="eyebrow">Case Workspace</p>
+        <h2>@Model.Title</h2>
+        <div class="case-meta">
+            <span class="badge severity-@Model.Severity.ToString().ToLowerInvariant()">@Model.Severity</span>
+            <span class="badge status-@Model.Status.ToString().ToLowerInvariant()">@Model.Status</span>
+            <span>@Model.CaseType.GetDisplayName()</span>
+        </div>
+    </div>
+    <a class="button button-secondary" asp-action="Index">Back to Cases</a>
+</section>
+
+<section class="workspace-grid">
+    <article class="workspace-section" id="overview">
+        <div class="panel-header">
+            <h2>Overview</h2>
+        </div>
+        <dl class="overview-list">
+            <dt>Case ID</dt>
+            <dd>@Model.CaseId</dd>
+            <dt>Title</dt>
+            <dd>@Model.Title</dd>
+            <dt>Severity</dt>
+            <dd><span class="badge severity-@Model.Severity.ToString().ToLowerInvariant()">@Model.Severity</span></dd>
+            <dt>Status</dt>
+            <dd><span class="badge status-@Model.Status.ToString().ToLowerInvariant()">@Model.Status</span></dd>
+            <dt>Case type</dt>
+            <dd>@Model.CaseType.GetDisplayName()</dd>
+            <dt>Source reference</dt>
+            <dd>@(Model.SourceReference ?? "Not provided")</dd>
+            <dt>Assigned team</dt>
+            <dd>@Model.AssignedTeam</dd>
+            <dt>Assigned user(s)</dt>
+            <dd>@(assignedUsers.Count == 0 ? "No owner selected" : string.Join(", ", assignedUsers))</dd>
+            <dt>Opened</dt>
+            <dd>@Model.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd>
+            <dt>Closed</dt>
+            <dd>@(Model.ClosedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "Open")</dd>
+            <dt>Created by</dt>
+            <dd>@(Model.CreatedBy?.UserName ?? "Unknown")</dd>
+            <dt>Visibility</dt>
+            <dd>@Model.Visibility</dd>
+        </dl>
+        <div class="summary-block">
+            <h3>Initial Summary</h3>
+            <p>@Model.InitialSummary</p>
+        </div>
+    </article>
+
+    <article class="workspace-section" id="playbook">
+        <div class="panel-header">
+            <h2>IR Playbook / Runbook Steps</h2>
+        </div>
+        <ul class="checklist">
+            <li><input type="checkbox" disabled /> Confirm scope and affected assets</li>
+            <li><input type="checkbox" disabled /> Preserve evidence metadata</li>
+            <li><input type="checkbox" disabled /> Build timeline of observed activity</li>
+            <li><input type="checkbox" disabled /> Document findings and IOCs</li>
+            <li><input type="checkbox" disabled /> Map observed behavior to MITRE ATT&amp;CK</li>
+            <li><input type="checkbox" disabled /> Prepare closure report</li>
+        </ul>
+    </article>
+
+    <article class="workspace-section" id="evidence">
+        <div class="panel-header">
+            <h2>Evidence</h2>
+            <a class="button button-secondary" href="#evidence">Add evidence</a>
+        </div>
+        <p class="empty-state">No evidence metadata has been documented yet. File upload is intentionally not enabled in this foundation slice.</p>
+    </article>
+
+    <article class="workspace-section" id="timeline">
+        <div class="panel-header">
+            <h2>Timeline</h2>
+            <a class="button button-secondary" href="#timeline">Add timeline entry</a>
+        </div>
+        <p class="empty-state">No timeline entries have been documented yet.</p>
+    </article>
+
+    <article class="workspace-section" id="findings">
+        <div class="panel-header">
+            <h2>Findings / IOCs</h2>
+        </div>
+        <p class="empty-state">No findings, observables, or indicators have been documented yet.</p>
+    </article>
+
+    <article class="workspace-section" id="mitre">
+        <div class="panel-header">
+            <h2>MITRE ATT&amp;CK Mapping</h2>
+        </div>
+        <p class="empty-state">Observed tactics, techniques, and procedures will be documented here as the investigation develops.</p>
+    </article>
+
+    <article class="workspace-section" id="notes">
+        <div class="panel-header">
+            <h2>Notes / Actions</h2>
+        </div>
+        <p class="empty-state">No analyst notes or response actions have been documented yet.</p>
+    </article>
+
+    <article class="workspace-section" id="closure">
+        <div class="panel-header">
+            <h2>Closure Report</h2>
+        </div>
+        <p class="empty-state">The closure report will be generated from documented case data once the case is ready to close.</p>
+    </article>
+</section>
