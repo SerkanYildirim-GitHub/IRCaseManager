@@ -48,8 +48,11 @@ public static class SeedData
             return;
         }
 
-        var adminPassword = configuration["DevelopmentSeed:AdminPassword"]
-            ?? Environment.GetEnvironmentVariable("IRCASEMANAGER_DEV_ADMIN_PASSWORD");
+        var adminPassword = Environment.GetEnvironmentVariable("IRCASEMANAGER_DEV_ADMIN_PASSWORD");
+        if (string.IsNullOrWhiteSpace(adminPassword))
+        {
+            adminPassword = configuration["DevelopmentSeed:AdminPassword"];
+        }
 
         if (string.IsNullOrWhiteSpace(adminPassword))
         {

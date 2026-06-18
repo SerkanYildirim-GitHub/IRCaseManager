@@ -19,10 +19,15 @@ public class DashboardController(AppDbContext db) : Controller
         ViewBag.WaitingCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.Waiting);
         ViewBag.ClosedCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.Closed);
 
-        var recentCases = await cases
+        var visibleCaseSet = await cases
+            .OrderByDescending(irCase => irCase.Id)
+            .Take(50)
+            .ToListAsync();
+
+        var recentCases = visibleCaseSet
             .OrderByDescending(irCase => irCase.OpenedAt)
             .Take(8)
-            .ToListAsync();
+            .ToList();
 
         return View(recentCases);
     }

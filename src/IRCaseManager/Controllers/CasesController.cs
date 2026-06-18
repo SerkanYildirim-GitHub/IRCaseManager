@@ -15,11 +15,14 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
 {
     public async Task<IActionResult> Index()
     {
-        var cases = await db.Cases
+        var visibleCaseSet = await db.Cases
             .AsNoTracking()
             .Include(irCase => irCase.CreatedBy)
-            .OrderByDescending(irCase => irCase.OpenedAt)
             .ToListAsync();
+
+        var cases = visibleCaseSet
+            .OrderByDescending(irCase => irCase.OpenedAt)
+            .ToList();
 
         return View(cases);
     }
