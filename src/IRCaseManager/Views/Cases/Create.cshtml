@@ -1,0 +1,57 @@
+@model IRCaseManager.ViewModels.CreateCaseViewModel
+@{
+    ViewData["Title"] = "Create New Case";
+}
+
+<section class="form-panel">
+    <form asp-action="Create" method="post" novalidate>
+        <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+
+        <div class="form-grid">
+            <div class="field field-wide">
+                <label asp-for="Title"></label>
+                <input asp-for="Title" maxlength="160" autocomplete="off" />
+                <span asp-validation-for="Title"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="Severity"></label>
+                <select asp-for="Severity" asp-items="Html.GetEnumSelectList<CaseSeverity>()">
+                    <option value="">Select severity</option>
+                </select>
+                <span asp-validation-for="Severity"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="CaseType"></label>
+                <select asp-for="CaseType" asp-items="Html.GetEnumSelectList<CaseType>()">
+                    <option value="">Select type</option>
+                </select>
+                <span asp-validation-for="CaseType"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="SourceReference"></label>
+                <input asp-for="SourceReference" maxlength="80" autocomplete="off" />
+                <span asp-validation-for="SourceReference"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="AssignedTeam"></label>
+                <input asp-for="AssignedTeam" maxlength="100" autocomplete="off" />
+                <span asp-validation-for="AssignedTeam"></span>
+            </div>
+
+            <div class="field field-wide">
+                <label asp-for="InitialSummary"></label>
+                <textarea asp-for="InitialSummary" maxlength="4000" rows="8"></textarea>
+                <span asp-validation-for="InitialSummary"></span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button">Create Case</button>
+            <a class="button button-secondary" asp-action="Index">Cancel</a>
+        </div>
+    </form>
+</section>

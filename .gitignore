@@ -1,0 +1,77 @@
+# Build outputs
+
+bin/
+obj/
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+publish/
+
+# .NET / ASP.NET local files
+
+*.user
+*.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+.idea/
+
+# Local configuration / secrets
+
+.env
+.env.*
+*.secrets.json
+secrets.json
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.pem
+*.key
+*.crt
+
+# Local databases
+
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+
+# Logs / temporary files
+
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Project-local tool/package/cache folders
+
+.dotnet_home/
+.nuget/
+packages/
+
+# Private prompts
+
+prompts/
+docs/*PROMPT*.md
+docs/*Prompt*.md
+docs/*prompt*.md
+docs/MAIN_PROMPT.md
+docs/NEXT_TASK.md
+docs/SECURITY_RULES.md
+
+# Screenshots / local images
+
+images/*
+!images/.gitkeep
+
+# OS files
+
+.DS_Store
+Thumbs.db

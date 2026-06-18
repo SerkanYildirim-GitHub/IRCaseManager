@@ -1,0 +1,22 @@
+@model IReadOnlyList<Case>
+@{
+    ViewData["Title"] = "Cases";
+}
+
+<section class="panel">
+    <div class="panel-header">
+        <h2>Case Queue</h2>
+        @if (User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel2) || User.IsInRole(RoleNames.AnalystLevel1))
+        {
+            <a class="button" asp-action="Create">Create New Case</a>
+        }
+    </div>
+    @if (Model.Count == 0)
+    {
+        <p class="muted">No cases exist yet. Create a case to start tracking investigation work.</p>
+    }
+    else
+    {
+        <partial name="_CaseTable" model="Model" />
+    }
+</section>

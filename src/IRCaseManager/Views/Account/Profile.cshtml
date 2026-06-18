@@ -1,0 +1,13 @@
+@{
+    ViewData["Title"] = "Profile";
+}
+
+<section class="panel">
+    <h2>Signed-in User</h2>
+    <dl class="profile-list">
+        <dt>Username</dt>
+        <dd>@User.Identity?.Name</dd>
+        <dt>Role</dt>
+        <dd>@User.Claims.FirstOrDefault(claim => claim.Type == System.Security.Claims.ClaimTypes.Role)?.Value</dd>
+    </dl>
+</section>

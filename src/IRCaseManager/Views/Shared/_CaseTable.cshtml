@@ -1,0 +1,31 @@
+@model IReadOnlyList<Case>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Case ID</th>
+                <th>Title</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>Team</th>
+                <th>Opened</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var irCase in Model)
+            {
+                <tr>
+                    <td><strong>@irCase.CaseId</strong></td>
+                    <td>@irCase.Title</td>
+                    <td><span class="badge severity-@irCase.Severity.ToString().ToLowerInvariant()">@irCase.Severity</span></td>
+                    <td><span class="badge status-@irCase.Status.ToString().ToLowerInvariant()">@irCase.Status</span></td>
+                    <td>@irCase.CaseType.GetDisplayName()</td>
+                    <td>@irCase.AssignedTeam</td>
+                    <td>@irCase.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

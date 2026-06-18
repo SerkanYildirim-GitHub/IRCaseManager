@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - IR Case Manager</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" aria-label="Primary navigation">
+            <a class="brand" asp-controller="Dashboard" asp-action="Index">
+                <span class="brand-mark">IR</span>
+                <span>
+                    <strong>IR Case Manager</strong>
+                    <small>Response workspace</small>
+                </span>
+            </a>
+            <nav class="nav-section">
+                <a asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                <a asp-controller="Cases" asp-action="Index">Cases</a>
+                <a asp-controller="Cases" asp-action="Create">Create New Case</a>
+                <a asp-controller="Resources" asp-action="Index">Resources</a>
+            </nav>
+            <div class="resources-nav">
+                <p>Resources</p>
+                <a href="https://attack.mitre.org/" target="_blank" rel="noopener noreferrer">MITRE ATT&amp;CK</a>
+                <a href="https://www.nist.gov/cyberframework" target="_blank" rel="noopener noreferrer">NIST CSF</a>
+                <a href="https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final" target="_blank" rel="noopener noreferrer">NIST IR Guidance</a>
+                <a href="https://www.cisecurity.org/controls" target="_blank" rel="noopener noreferrer">CIS Controls</a>
+            </div>
+        </aside>
+
+        <div class="main-region">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Secure local foundation</p>
+                    <h1>@ViewData["Title"]</h1>
+                </div>
+                <div class="user-actions">
+                    <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <a asp-controller="Account" asp-action="Profile">@User.Identity.Name</a>
+                        <form asp-controller="Account" asp-action="Logout" method="post">
+                            <button type="submit" class="link-button">Sign out</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a asp-controller="Account" asp-action="Login">Sign in</a>
+                    }
+                </div>
+            </header>
+            <main class="content" role="main">
+                @if (TempData["StatusMessage"] is string statusMessage)
+                {
+                    <div class="notice" role="status">@statusMessage</div>
+                }
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

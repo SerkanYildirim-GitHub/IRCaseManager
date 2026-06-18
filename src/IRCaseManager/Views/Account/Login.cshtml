@@ -1,0 +1,25 @@
+@model IRCaseManager.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<section class="auth-panel">
+    <form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+        <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+        <div class="field">
+            <label asp-for="UserName"></label>
+            <input asp-for="UserName" autocomplete="username" maxlength="100" />
+            <span asp-validation-for="UserName"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Password"></label>
+            <input asp-for="Password" autocomplete="current-password" maxlength="256" />
+            <span asp-validation-for="Password"></span>
+        </div>
+        <label class="check-row">
+            <input asp-for="RememberMe" />
+            <span>Remember this browser</span>
+        </label>
+        <button type="submit" class="button">Sign in</button>
+    </form>
+</section>
