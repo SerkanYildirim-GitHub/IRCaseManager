@@ -6,6 +6,9 @@
         .Select(assignment => assignment.ApplicationUser!.UserName)
         .OrderBy(userName => userName)
         .ToList();
+    var canClose = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2);
+    var canReopen = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel2);
+    var canEscalate = canClose;
 }
 
 <section class="case-heading">
@@ -18,7 +21,27 @@
             <span>@Model.CaseType.GetDisplayName()</span>
         </div>
     </div>
-    <a class="button button-secondary" asp-action="Index">Back to Cases</a>
+    <div class="case-actions">
+        @if (canEscalate && Model.Status != CaseStatus.Escalated && Model.Status != CaseStatus.Closed)
+        {
+            <form asp-action="Escalate" asp-route-id="@Model.CaseId" method="post">
+                <button class="button button-secondary" type="submit">Escalate</button>
+            </form>
+        }
+        @if (canClose && Model.Status != CaseStatus.Closed)
+        {
+            <form asp-action="Close" asp-route-id="@Model.CaseId" method="post">
+                <button class="button" type="submit">Close Case</button>
+            </form>
+        }
+        @if (canReopen && Model.Status == CaseStatus.Closed)
+        {
+            <form asp-action="Reopen" asp-route-id="@Model.CaseId" method="post">
+                <button class="button" type="submit">Reopen Case</button>
+            </form>
+        }
+        <a class="button button-secondary" asp-action="Index">Back to Cases</a>
+    </div>
 </section>
 
 <section class="workspace-grid">
