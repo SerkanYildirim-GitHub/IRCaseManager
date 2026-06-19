@@ -66,8 +66,8 @@
                 <dd>@(caseRecord.SourceReference ?? "Not provided")</dd>
                 <dt>Assigned team</dt>
                 <dd>@caseRecord.AssignedTeam</dd>
-                <dt>Assigned user(s)</dt>
-                <dd>@(assignedUsers.Count == 0 ? "No owner selected" : string.Join(", ", assignedUsers))</dd>
+                <dt>Assigned to</dt>
+                <dd>@(assignedUsers.Count == 0 ? "Unassigned" : string.Join(", ", assignedUsers))</dd>
                 <dt>Opened</dt>
                 <dd>@caseRecord.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd>
                 <dt>Closed</dt>

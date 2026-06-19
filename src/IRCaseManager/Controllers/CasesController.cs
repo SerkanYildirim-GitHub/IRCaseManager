@@ -61,7 +61,7 @@ public class CasesController(
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        await PopulateAssignedUserOptionsAsync();
+        await PopulateCreateCaseOptionsAsync();
         return View(new CreateCaseViewModel());
     }
 
@@ -73,7 +73,7 @@ public class CasesController(
 
         if (!ModelState.IsValid)
         {
-            await PopulateAssignedUserOptionsAsync();
+            await PopulateCreateCaseOptionsAsync();
             return View(model);
         }
 
@@ -85,26 +85,35 @@ public class CasesController(
 
         if (model.AssignedUserId is not null)
         {
-            var assignedUserExists = await db.Users.AnyAsync(applicationUser =>
-                applicationUser.Id == model.AssignedUserId.Value && applicationUser.IsActive);
+            var assignedUserExists = await db.Users
+                .Include(applicationUser => applicationUser.Role)
+                .AnyAsync(applicationUser =>
+                    applicationUser.Id == model.AssignedUserId.Value &&
+                    applicationUser.IsActive &&
+                    applicationUser.Role != null &&
+                    (applicationUser.Role.Name == RoleNames.AnalystLevel1 ||
+                     applicationUser.Role.Name == RoleNames.AnalystLevel2));
 
             if (!assignedUserExists)
             {
-                ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid active user.");
-                await PopulateAssignedUserOptionsAsync();
+                ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid Analyst Level 1 or Analyst Level 2 user.");
+                await PopulateCreateCaseOptionsAsync();
                 return View(model);
             }
         }
 
         var openedAt = DateTimeOffset.UtcNow;
+        var caseId = await caseIdGenerator.GenerateAsync(openedAt);
+        var sourceReference = GenerateSourceReference(caseId);
+        var caseTypeName = model.CaseType!.Value.GetDisplayName();
         var irCase = new Case
         {
-            CaseId = await caseIdGenerator.GenerateAsync(openedAt),
-            Title = model.Title,
+            CaseId = caseId,
+            Title = $"{caseId} - {caseTypeName}",
             Severity = model.Severity!.Value,
             CaseType = model.CaseType!.Value,
-            Status = CaseStatus.New,
-            SourceReference = model.SourceReference,
+            Status = model.AssignedUserId is null ? CaseStatus.New : CaseStatus.Assigned,
+            SourceReference = sourceReference,
             AssignedTeam = model.AssignedTeam,
             OpenedAt = openedAt,
             InitialSummary = model.InitialSummary,
@@ -363,6 +372,39 @@ public class CasesController(
             .ToListAsync();
 
         ViewBag.AssignedUserOptions = users;
+    }
+
+    private async Task PopulateCreateCaseOptionsAsync()
+    {
+        ViewBag.AssignedTeamOptions = new List<SelectListItem>
+        {
+            new() { Value = "Incident Response", Text = "Incident Response" },
+            new() { Value = "IT Support", Text = "IT Support" }
+        };
+
+        var users = await db.Users
+            .AsNoTracking()
+            .Include(applicationUser => applicationUser.Role)
+            .Where(applicationUser =>
+                applicationUser.IsActive &&
+                applicationUser.Role != null &&
+                (applicationUser.Role.Name == RoleNames.AnalystLevel1 ||
+                 applicationUser.Role.Name == RoleNames.AnalystLevel2))
+            .OrderBy(applicationUser => applicationUser.UserName)
+            .Select(applicationUser => new SelectListItem
+            {
+                Value = applicationUser.Id.ToString(),
+                Text = applicationUser.UserName
+            })
+            .ToListAsync();
+
+        ViewBag.AssignedUserOptions = users;
+    }
+
+    private static string GenerateSourceReference(string caseId)
+    {
+        var sequence = caseId.Split('-').LastOrDefault();
+        return int.TryParse(sequence, out var number) ? $"TK-{number:00000}" : "TK-00000";
     }
 
     private async Task<IActionResult> UpdateCaseLifecycleAsync(

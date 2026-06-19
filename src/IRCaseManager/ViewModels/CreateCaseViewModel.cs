@@ -5,10 +5,6 @@ namespace IRCaseManager.ViewModels;
 
 public class CreateCaseViewModel : IValidatableObject
 {
-    [Required, StringLength(160, MinimumLength = 4)]
-    [Display(Name = "Case title")]
-    public string Title { get; set; } = string.Empty;
-
     [Required]
     public CaseSeverity? Severity { get; set; }
 
@@ -16,15 +12,11 @@ public class CreateCaseViewModel : IValidatableObject
     [Display(Name = "Case type")]
     public CaseType? CaseType { get; set; }
 
-    [StringLength(80)]
-    [Display(Name = "Source reference")]
-    public string? SourceReference { get; set; }
-
     [Required, StringLength(100, MinimumLength = 2)]
     [Display(Name = "Assigned team")]
     public string AssignedTeam { get; set; } = string.Empty;
 
-    [Display(Name = "Assigned user / owner")]
+    [Display(Name = "Assigned to")]
     public int? AssignedUserId { get; set; }
 
     [Required, StringLength(4000, MinimumLength = 10)]
@@ -33,10 +25,8 @@ public class CreateCaseViewModel : IValidatableObject
 
     public void Trim()
     {
-        Title = Title.Trim();
-        SourceReference = string.IsNullOrWhiteSpace(SourceReference) ? null : SourceReference.Trim();
-        AssignedTeam = AssignedTeam.Trim();
-        InitialSummary = InitialSummary.Trim();
+        AssignedTeam = AssignedTeam?.Trim() ?? string.Empty;
+        InitialSummary = InitialSummary?.Trim() ?? string.Empty;
     }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -49,6 +39,12 @@ public class CreateCaseViewModel : IValidatableObject
         if (CaseType is not null && !Enum.IsDefined(typeof(CaseType), CaseType.Value))
         {
             yield return new ValidationResult("Select a valid case type.", [nameof(CaseType)]);
+        }
+
+        var allowedTeams = new[] { "Incident Response", "IT Support" };
+        if (!string.IsNullOrWhiteSpace(AssignedTeam) && !allowedTeams.Contains(AssignedTeam, StringComparer.Ordinal))
+        {
+            yield return new ValidationResult("Select a valid assigned team.", [nameof(AssignedTeam)]);
         }
     }
 }

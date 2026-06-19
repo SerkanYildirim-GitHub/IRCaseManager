@@ -8,10 +8,12 @@
         <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
 
         <div class="form-grid">
-            <div class="field field-wide">
-                <label asp-for="Title"></label>
-                <input asp-for="Title" maxlength="160" autocomplete="off" />
-                <span asp-validation-for="Title"></span>
+            <div class="field">
+                <label asp-for="CaseType"></label>
+                <select asp-for="CaseType" asp-items="Html.GetEnumSelectList<CaseType>()">
+                    <option value="">Select type</option>
+                </select>
+                <span asp-validation-for="CaseType"></span>
             </div>
 
             <div class="field">
@@ -23,36 +25,24 @@
             </div>
 
             <div class="field">
-                <label asp-for="CaseType"></label>
-                <select asp-for="CaseType" asp-items="Html.GetEnumSelectList<CaseType>()">
-                    <option value="">Select type</option>
-                </select>
-                <span asp-validation-for="CaseType"></span>
-            </div>
-
-            <div class="field">
-                <label asp-for="SourceReference"></label>
-                <input asp-for="SourceReference" maxlength="80" autocomplete="off" />
-                <span asp-validation-for="SourceReference"></span>
-            </div>
-
-            <div class="field">
                 <label asp-for="AssignedTeam"></label>
-                <input asp-for="AssignedTeam" maxlength="100" autocomplete="off" />
+                <select asp-for="AssignedTeam" asp-items="ViewBag.AssignedTeamOptions">
+                    <option value="">Select team</option>
+                </select>
                 <span asp-validation-for="AssignedTeam"></span>
             </div>
 
             <div class="field">
                 <label asp-for="AssignedUserId"></label>
                 <select asp-for="AssignedUserId" asp-items="ViewBag.AssignedUserOptions">
-                    <option value="">No owner selected</option>
+                    <option value="">Unassigned</option>
                 </select>
                 <span asp-validation-for="AssignedUserId"></span>
             </div>
 
             <div class="field field-wide">
                 <label asp-for="InitialSummary"></label>
-                <textarea asp-for="InitialSummary" maxlength="4000" rows="8"></textarea>
+                <textarea asp-for="InitialSummary" maxlength="4000" rows="8" placeholder="Summarize the incident, alert, or ticket that opened this case. Include what was reported, observed, or suspected."></textarea>
                 <span asp-validation-for="InitialSummary"></span>
             </div>
         </div>
