@@ -39,10 +39,13 @@
     return;
   }
 
-  const filters = Array.from(table.querySelectorAll("[data-case-filter]"));
-  const rows = Array.from(table.querySelectorAll("[data-case-row]"));
-  const shells = Array.from(table.querySelectorAll("[data-case-filter-shell]"));
+  if (table.dataset.caseFiltersReady === "true") {
+    return;
+  }
+  table.dataset.caseFiltersReady = "true";
+
   const emptyState = document.querySelector("[data-case-filter-empty]");
+  const filterKeys = ["date", "case-id", "title", "type", "severity", "assigned-to", "team", "status"];
 
   function normalize(value) {
     return (value || "").trim().toLowerCase();
@@ -54,42 +57,67 @@
     });
   }
 
-  function closeMenus(exceptShell) {
-    shells.forEach(function (shell) {
-      if (shell === exceptShell) {
-        return;
-      }
+  const filterControls = Array.from(table.querySelectorAll("[data-case-filter]")).map(function (field) {
+    return {
+      field: field,
+      key: field.dataset.caseFilter
+    };
+  });
 
-      const button = shell.querySelector("[data-case-filter-toggle]");
-      const menu = shell.querySelector("[data-case-filter-menu]");
-      shell.classList.remove("is-open");
-      if (button) {
-        button.setAttribute("aria-expanded", "false");
-      }
-      if (menu) {
-        menu.hidden = true;
-      }
+  const shellControls = Array.from(table.querySelectorAll("[data-case-filter-shell]")).map(function (shell) {
+    return {
+      shell: shell,
+      button: shell.querySelector("[data-case-filter-toggle]"),
+      menu: shell.querySelector("[data-case-filter-menu]"),
+      field: shell.querySelector("[data-case-filter]")
+    };
+  });
+
+  const rowCache = Array.from(table.querySelectorAll("[data-case-row]")).map(function (row) {
+    const values = {};
+    filterKeys.forEach(function (key) {
+      values[key] = normalize(row.dataset[toDatasetKey(key)]);
     });
+
+    return {
+      row: row,
+      values: values
+    };
+  });
+
+  let openShell = null;
+
+  function setShellOpen(control, isOpen) {
+    control.shell.classList.toggle("is-open", isOpen);
+    control.menu.hidden = !isOpen;
+    control.button.setAttribute("aria-expanded", String(isOpen));
+    openShell = isOpen ? control : openShell === control ? null : openShell;
+  }
+
+  function closeOpenMenu() {
+    if (openShell) {
+      setShellOpen(openShell, false);
+    }
   }
 
   function updateActiveHeaders() {
-    shells.forEach(function (shell) {
-      const filter = shell.querySelector("[data-case-filter]");
-      const button = shell.querySelector("[data-case-filter-toggle]");
-      const isActive = filter && normalize(filter.value).length > 0;
-      shell.classList.toggle("is-active", Boolean(isActive));
-      if (button) {
-        button.classList.toggle("is-active", Boolean(isActive));
+    shellControls.forEach(function (control) {
+      if (!control.button || !control.field) {
+        return;
       }
+
+      const isActive = normalize(control.field.value).length > 0;
+      control.shell.classList.toggle("is-active", isActive);
+      control.button.classList.toggle("is-active", isActive);
     });
   }
 
   function applyFilters() {
-    const activeFilters = filters
-      .map(function (filter) {
+    const activeFilters = filterControls
+      .map(function (control) {
         return {
-          key: filter.dataset.caseFilter,
-          value: normalize(filter.value)
+          key: control.key,
+          value: normalize(control.field.value)
         };
       })
       .filter(function (filter) {
@@ -98,12 +126,17 @@
 
     let visibleCount = 0;
 
-    rows.forEach(function (row) {
+    // Compute visibility first and only write DOM when visibility actually changes.
+    rowCache.forEach(function (record) {
       const isVisible = activeFilters.every(function (filter) {
-        return normalize(row.dataset[toDatasetKey(filter.key)]).includes(filter.value);
+        return record.values[filter.key].includes(filter.value);
       });
 
-      row.hidden = !isVisible;
+      const shouldBeHidden = !isVisible;
+      if (record.row.hidden !== shouldBeHidden) {
+        record.row.hidden = shouldBeHidden;
+      }
+
       if (isVisible) {
         visibleCount += 1;
       }
@@ -116,47 +149,72 @@
     updateActiveHeaders();
   }
 
-  shells.forEach(function (shell) {
-    const button = shell.querySelector("[data-case-filter-toggle]");
-    const menu = shell.querySelector("[data-case-filter-menu]");
-    const field = shell.querySelector("[data-case-filter]");
-
-    if (!button || !menu) {
+  shellControls.forEach(function (control) {
+    if (!control.button || !control.menu) {
       return;
     }
 
-    button.addEventListener("click", function () {
-      const isOpening = menu.hidden;
-      closeMenus(shell);
-      shell.classList.toggle("is-open", isOpening);
-      menu.hidden = !isOpening;
-      button.setAttribute("aria-expanded", String(isOpening));
+    control.button.addEventListener("click", function (event) {
+      event.stopPropagation();
+      const isOpening = control.menu.hidden;
 
-      if (isOpening && field) {
-        field.focus();
+      if (openShell && openShell !== control) {
+        closeOpenMenu();
       }
+
+      setShellOpen(control, isOpening);
+
+      if (isOpening && control.field) {
+        // Delay focus slightly to avoid blocking the click path on some browsers/devices.
+        setTimeout(function () {
+          try {
+            control.field.focus({ preventScroll: true });
+          } catch (e) {
+            control.field.focus();
+          }
+        }, 0);
+      }
+    });
+
+    control.menu.addEventListener("click", function (event) {
+      event.stopPropagation();
     });
   });
 
-  filters.forEach(function (filter) {
-    filter.addEventListener("input", applyFilters);
-    filter.addEventListener("change", applyFilters);
+  filterControls.forEach(function (control) {
+    // Debounce free-text inputs to avoid running expensive filtering on every keystroke.
+    var tag = (control.field && control.field.tagName) ? control.field.tagName.toUpperCase() : "";
+    if (tag === "SELECT") {
+      control.field.addEventListener("change", applyFilters);
+    } else {
+      var debounceTimer = null;
+      control.field.addEventListener("input", function () {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(function () {
+          applyFilters();
+        }, 150);
+      });
+      // Keep change immediate for inputs that may not fire input events (accessibility devices)
+      control.field.addEventListener("change", applyFilters);
+    }
   });
 
-  document.addEventListener("click", function (event) {
+  document.addEventListener("pointerdown", function (event) {
     if (!table.contains(event.target)) {
-      closeMenus();
+      closeOpenMenu();
       return;
     }
 
     if (!event.target.closest("[data-case-filter-shell]")) {
-      closeMenus();
+      closeOpenMenu();
     }
   });
 
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
-      closeMenus();
+      closeOpenMenu();
     }
   });
 })();
