@@ -34,6 +34,19 @@
 })();
 
 (function () {
+  const dropdowns = document.querySelectorAll(".nav-dropdown");
+  dropdowns.forEach(function (dropdown) {
+    dropdown.addEventListener("mouseenter", function () {
+      dropdown.open = true;
+    });
+
+    dropdown.addEventListener("mouseleave", function () {
+      dropdown.open = false;
+    });
+  });
+})();
+
+(function () {
   const table = document.querySelector("[data-case-filter-table]");
   if (!table) {
     return;

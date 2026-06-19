@@ -104,9 +104,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .brand small, .eyebrow, .muted { color: var(--muted); }
 .nav-section, .user-actions { display: flex; flex-direction: column; gap: 8px; }
 .nav-section { flex: 1; }
-.nav-section a, .nav-dropdown summary { padding: 10px 12px; border-radius: 8px; color: var(--text); }
+.nav-section > a, .nav-dropdown summary { padding: 10px 12px; border-radius: 8px; color: var(--text); font-weight: 700; }
+.nav-section a { color: var(--text); }
 .nav-section a:hover, .nav-dropdown summary:hover { background: var(--surface-strong); text-decoration: none; }
-.nav-dropdown summary { cursor: pointer; font-weight: 700; }
+.nav-dropdown summary { cursor: pointer; }
 .nav-dropdown div { display: grid; gap: 4px; padding: 4px 0 0 12px; }
 .nav-dropdown div a { font-size: 0.94rem; }
 .sidebar-footer { display: grid; gap: 3px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
