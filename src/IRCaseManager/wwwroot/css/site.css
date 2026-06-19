@@ -112,11 +112,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .eyebrow { margin: 0 0 4px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; }
 .user-actions { flex-direction: row; align-items: center; flex-wrap: wrap; }
 .content { width: min(1680px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0; }
-.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .metric, .panel, .form-panel, .auth-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
 .metric { padding: 18px; border-left: 6px solid var(--primary); }
 .metric span, .metric strong { display: block; }
 .metric strong { margin-top: 8px; font-size: 2rem; }
+.metric-breakdown { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 12px; color: var(--muted); font-size: 0.86rem; font-weight: 700; }
+.metric-breakdown span { display: inline; white-space: nowrap; }
 .metric-critical { border-left-color: #dc2626; }
 .metric-waiting { border-left-color: #d97706; }
 .metric-closed { border-left-color: #16a34a; }

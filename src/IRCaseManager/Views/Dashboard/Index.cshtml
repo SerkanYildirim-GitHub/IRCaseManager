@@ -4,33 +4,6 @@
 }
 
 <section class="metric-grid" aria-label="Case metrics">
-    <article class="metric metric-neutral">
-        <span>Total</span>
-        <strong>@ViewBag.TotalCases</strong>
-    </article>
-    <article class="metric status-new">
-        <span>New</span>
-        <strong>@ViewBag.NewCases</strong>
-    </article>
-    <article class="metric status-assigned">
-        <span>Assigned / Open</span>
-        <strong>@ViewBag.AssignedCases</strong>
-    </article>
-    <article class="metric status-escalated">
-        <span>Escalated</span>
-        <strong>@ViewBag.EscalatedCases</strong>
-    </article>
-    <article class="metric metric-waiting">
-        <span>Waiting</span>
-        <strong>@ViewBag.WaitingCases</strong>
-    </article>
-    <article class="metric metric-closed">
-        <span>Closed</span>
-        <strong>@ViewBag.ClosedCases</strong>
-    </article>
-</section>
-
-<section class="metric-grid severity-grid" aria-label="Severity metrics">
     <article class="metric severity-critical">
         <span>Critical</span>
         <strong>@ViewBag.CriticalCases</strong>
@@ -47,13 +20,20 @@
         <span>Low</span>
         <strong>@ViewBag.LowCases</strong>
     </article>
-    @if ((int)ViewBag.InformationalCases > 0)
-    {
-        <article class="metric severity-informational">
-            <span>Informational</span>
-            <strong>@ViewBag.InformationalCases</strong>
-        </article>
-    }
+    <article class="metric severity-informational">
+        <span>Informational</span>
+        <strong>@ViewBag.InformationalCases</strong>
+    </article>
+    <article class="metric metric-neutral metric-total">
+        <span>Total</span>
+        <strong>@ViewBag.TotalCases</strong>
+        <div class="metric-breakdown" aria-label="Status breakdown">
+            <span>New @ViewBag.NewCases</span>
+            <span>Assigned @ViewBag.AssignedCases</span>
+            <span>Escalated @ViewBag.EscalatedCases</span>
+            <span>Closed @ViewBag.ClosedCases</span>
+        </div>
+    </article>
 </section>
 
 <section class="panel">
