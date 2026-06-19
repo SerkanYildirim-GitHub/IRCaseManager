@@ -1,0 +1,66 @@
+@model IRCaseManager.ViewModels.EditCaseViewModel
+@{
+    ViewData["Title"] = "Edit Case";
+}
+
+<section class="form-panel">
+    <form asp-action="Edit" asp-route-id="@Model.CaseId" method="post" novalidate>
+        <input asp-for="CaseId" type="hidden" />
+        <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+
+        <div class="form-grid">
+            <div class="field">
+                <label>Case ID</label>
+                <input value="@Model.CaseId" readonly />
+            </div>
+
+            <div class="field">
+                <label asp-for="SourceReference"></label>
+                <input asp-for="SourceReference" readonly />
+            </div>
+
+            <div class="field">
+                <label asp-for="CaseType"></label>
+                <select asp-for="CaseType" asp-items="Html.GetEnumSelectList<CaseType>()">
+                    <option value="">Select type</option>
+                </select>
+                <span asp-validation-for="CaseType"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="Severity"></label>
+                <select asp-for="Severity" asp-items="Html.GetEnumSelectList<CaseSeverity>()">
+                    <option value="">Select severity</option>
+                </select>
+                <span asp-validation-for="Severity"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="AssignedTeam"></label>
+                <select asp-for="AssignedTeam" asp-items="ViewBag.AssignedTeamOptions">
+                    <option value="">Select team</option>
+                </select>
+                <span asp-validation-for="AssignedTeam"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="AssignedUserId"></label>
+                <select asp-for="AssignedUserId" asp-items="ViewBag.AssignedUserOptions">
+                    <option value="">Unassigned</option>
+                </select>
+                <span asp-validation-for="AssignedUserId"></span>
+            </div>
+
+            <div class="field field-wide">
+                <label asp-for="InitialSummary"></label>
+                <textarea asp-for="InitialSummary" maxlength="4000" rows="8" placeholder="Summarize the incident, alert, or ticket that opened this case. Include what was reported, observed, or suspected."></textarea>
+                <span asp-validation-for="InitialSummary"></span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button">Save Case</button>
+            <a class="button button-secondary" asp-action="Details" asp-route-id="@Model.CaseId">Cancel</a>
+        </div>
+    </form>
+</section>

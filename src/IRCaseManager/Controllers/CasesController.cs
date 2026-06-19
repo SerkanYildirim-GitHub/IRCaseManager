@@ -88,16 +88,7 @@ public class CasesController(
 
         if (model.AssignedUserId is not null)
         {
-            var assignedUserExists = await db.Users
-                .Include(applicationUser => applicationUser.Role)
-                .AnyAsync(applicationUser =>
-                    applicationUser.Id == model.AssignedUserId.Value &&
-                    applicationUser.IsActive &&
-                    applicationUser.Role != null &&
-                    (applicationUser.Role.Name == RoleNames.AnalystLevel1 ||
-                     applicationUser.Role.Name == RoleNames.AnalystLevel2));
-
-            if (!assignedUserExists)
+            if (!await IsAssignableAnalystAsync(model.AssignedUserId.Value))
             {
                 ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid Analyst Level 1 or Analyst Level 2 user.");
                 await PopulateCreateCaseOptionsAsync();
@@ -149,6 +140,134 @@ public class CasesController(
 
         await db.SaveChangesAsync();
         TempData["StatusMessage"] = $"Created {irCase.CaseId}.";
+        return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
+    [HttpGet]
+    public async Task<IActionResult> Edit(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return NotFound();
+        }
+
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases.AsNoTracking(), User)
+            .Include(caseRecord => caseRecord.Assignments)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+
+        if (irCase is null)
+        {
+            return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!CanEditCase(irCase))
+        {
+            return Forbid();
+        }
+
+        await PopulateCreateCaseOptionsAsync();
+        return View(new EditCaseViewModel
+        {
+            CaseId = irCase.CaseId,
+            SourceReference = irCase.SourceReference,
+            CaseType = irCase.CaseType,
+            Severity = irCase.Severity,
+            AssignedTeam = irCase.AssignedTeam,
+            AssignedUserId = irCase.Assignments.Select(assignment => (int?)assignment.ApplicationUserId).FirstOrDefault(),
+            InitialSummary = irCase.InitialSummary
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
+    [HttpPost]
+    public async Task<IActionResult> Edit(string id, EditCaseViewModel model)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return NotFound();
+        }
+
+        model.Trim();
+
+        if (!string.Equals(id, model.CaseId, StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
+            .Include(caseRecord => caseRecord.Assignments)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+
+        if (irCase is null)
+        {
+            return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!CanEditCase(irCase))
+        {
+            return Forbid();
+        }
+
+        if (model.AssignedUserId is not null && !await IsAssignableAnalystAsync(model.AssignedUserId.Value))
+        {
+            ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid Analyst Level 1 or Analyst Level 2 user.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            model.SourceReference = irCase.SourceReference;
+            await PopulateCreateCaseOptionsAsync();
+            return View(model);
+        }
+
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Challenge();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var caseTypeName = model.CaseType!.Value.GetDisplayName();
+        irCase.CaseType = model.CaseType.Value;
+        irCase.Title = $"{irCase.CaseId} - {caseTypeName}";
+        irCase.Severity = model.Severity!.Value;
+        irCase.AssignedTeam = model.AssignedTeam;
+        irCase.InitialSummary = model.InitialSummary;
+        irCase.UpdatedAt = now;
+        irCase.UpdatedById = userId.Value;
+
+        var selectedAssignedUserId = model.AssignedUserId;
+        foreach (var assignment in irCase.Assignments.Where(assignment => assignment.ApplicationUserId != selectedAssignedUserId).ToList())
+        {
+            db.CaseAssignments.Remove(assignment);
+        }
+
+        if (selectedAssignedUserId is not null &&
+            !irCase.Assignments.Any(assignment => assignment.ApplicationUserId == selectedAssignedUserId.Value))
+        {
+            db.CaseAssignments.Add(new CaseAssignment
+            {
+                CaseId = irCase.Id,
+                ApplicationUserId = selectedAssignedUserId.Value,
+                AssignedById = userId.Value,
+                AssignedAt = now
+            });
+        }
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ApplicationUserId = userId,
+            Action = "CaseUpdated",
+            EntityType = nameof(Case),
+            EntityId = irCase.CaseId,
+            Summary = "Basic case information updated."
+        });
+
+        await db.SaveChangesAsync();
+        TempData["StatusMessage"] = $"Updated {irCase.CaseId}.";
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
     }
 
@@ -415,6 +534,18 @@ public class CasesController(
             .ToList();
     }
 
+    private async Task<bool> IsAssignableAnalystAsync(int userId)
+    {
+        return await db.Users
+            .Include(applicationUser => applicationUser.Role)
+            .AnyAsync(applicationUser =>
+                applicationUser.Id == userId &&
+                applicationUser.IsActive &&
+                applicationUser.Role != null &&
+                (applicationUser.Role.Name == RoleNames.AnalystLevel1 ||
+                 applicationUser.Role.Name == RoleNames.AnalystLevel2));
+    }
+
     private static string GetAssignedUserOptionText(string userName, string roleName)
     {
         return userName switch
@@ -513,6 +644,17 @@ public class CasesController(
         return User.IsInRole(RoleNames.Admin)
             || User.IsInRole(RoleNames.AnalystLevel1)
             || User.IsInRole(RoleNames.AnalystLevel2);
+    }
+
+    private bool CanEditCase(Case irCase)
+    {
+        if (User.IsInRole(RoleNames.Admin))
+        {
+            return true;
+        }
+
+        return irCase.Status != CaseStatus.Closed &&
+            (User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2));
     }
 
     private CaseWorkspaceViewModel BuildWorkspaceViewModel(

@@ -1,8 +1,7 @@
 @model IReadOnlyList<Case>
 @{
-    var canShowEditPlaceholder = User.IsInRole(RoleNames.Admin)
-        || User.IsInRole(RoleNames.AnalystLevel1)
-        || User.IsInRole(RoleNames.AnalystLevel2);
+    var isAdmin = User.IsInRole(RoleNames.Admin);
+    var isAnalyst = User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2);
 }
 
 <div class="table-wrap">
@@ -90,9 +89,13 @@
                     <td>@irCase.AssignedTeam</td>
                     <td><span class="badge status-@irCase.Status.ToString().ToLowerInvariant()">@irCase.Status</span></td>
                     <td>
-                        @if (canShowEditPlaceholder)
+                        @if (CanEditRow(irCase, isAdmin, isAnalyst))
                         {
-                            <button class="button button-compact" type="button" disabled title="Edit workflow not available yet">Edit</button>
+                            <a class="button button-compact" asp-controller="Cases" asp-action="Edit" asp-route-id="@irCase.CaseId">Edit</a>
+                        }
+                        else if (isAnalyst && irCase.Status == CaseStatus.Closed)
+                        {
+                            <button class="button button-compact" type="button" disabled title="Closed cases are read-only">Edit</button>
                         }
                         else
                         {
@@ -120,5 +123,10 @@
             "analyst.l2.local" => RoleNames.AnalystLevel2,
             _ => assignedUserName
         };
+    }
+
+    private static bool CanEditRow(Case irCase, bool isAdmin, bool isAnalyst)
+    {
+        return isAdmin || (isAnalyst && irCase.Status != CaseStatus.Closed);
     }
 }
