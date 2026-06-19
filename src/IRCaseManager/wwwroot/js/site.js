@@ -44,8 +44,9 @@
   }
   table.dataset.caseFiltersReady = "true";
 
+  const filterRoot = table.closest(".table-wrap") || document;
   const emptyState = document.querySelector("[data-case-filter-empty]");
-  const filterKeys = ["date", "case-id", "title", "type", "severity", "assigned-to", "team", "status"];
+  const filterKeys = ["date", "type", "severity", "assigned-to", "team", "status"];
 
   function normalize(value) {
     return (value || "").trim().toLowerCase();
@@ -57,21 +58,15 @@
     });
   }
 
-  const filterControls = Array.from(table.querySelectorAll("[data-case-filter]")).map(function (field) {
+  const filterControls = Array.from(filterRoot.querySelectorAll("[data-case-filter]")).map(function (field) {
     return {
       field: field,
       key: field.dataset.caseFilter
     };
   });
 
-  const shellControls = Array.from(table.querySelectorAll("[data-case-filter-shell]")).map(function (shell) {
-    return {
-      shell: shell,
-      button: shell.querySelector("[data-case-filter-toggle]"),
-      menu: shell.querySelector("[data-case-filter-menu]"),
-      field: shell.querySelector("[data-case-filter]")
-    };
-  });
+  const clearAllButton = filterRoot.querySelector("[data-case-filter-clear-all]");
+  const filterCount = filterRoot.querySelector("[data-case-filter-count]");
 
   const rowCache = Array.from(table.querySelectorAll("[data-case-row]")).map(function (row) {
     const values = {};
@@ -84,33 +79,6 @@
       values: values
     };
   });
-
-  let openShell = null;
-
-  function setShellOpen(control, isOpen) {
-    control.shell.classList.toggle("is-open", isOpen);
-    control.menu.hidden = !isOpen;
-    control.button.setAttribute("aria-expanded", String(isOpen));
-    openShell = isOpen ? control : openShell === control ? null : openShell;
-  }
-
-  function closeOpenMenu() {
-    if (openShell) {
-      setShellOpen(openShell, false);
-    }
-  }
-
-  function updateActiveHeaders() {
-    shellControls.forEach(function (control) {
-      if (!control.button || !control.field) {
-        return;
-      }
-
-      const isActive = normalize(control.field.value).length > 0;
-      control.shell.classList.toggle("is-active", isActive);
-      control.button.classList.toggle("is-active", isActive);
-    });
-  }
 
   function applyFilters() {
     const activeFilters = filterControls
@@ -129,7 +97,7 @@
     // Compute visibility first and only write DOM when visibility actually changes.
     rowCache.forEach(function (record) {
       const isVisible = activeFilters.every(function (filter) {
-        return record.values[filter.key].includes(filter.value);
+        return record.values[filter.key] === filter.value;
       });
 
       const shouldBeHidden = !isVisible;
@@ -146,40 +114,11 @@
       emptyState.hidden = visibleCount > 0;
     }
 
-    updateActiveHeaders();
-  }
-
-  shellControls.forEach(function (control) {
-    if (!control.button || !control.menu) {
-      return;
+    if (filterCount) {
+      filterCount.textContent = "Showing " + visibleCount + " of " + rowCache.length + " cases";
     }
 
-    control.button.addEventListener("click", function (event) {
-      event.stopPropagation();
-      const isOpening = control.menu.hidden;
-
-      if (openShell && openShell !== control) {
-        closeOpenMenu();
-      }
-
-      setShellOpen(control, isOpening);
-
-      if (isOpening && control.field) {
-        // Delay focus slightly to avoid blocking the click path on some browsers/devices.
-        setTimeout(function () {
-          try {
-            control.field.focus({ preventScroll: true });
-          } catch (e) {
-            control.field.focus();
-          }
-        }, 0);
-      }
-    });
-
-    control.menu.addEventListener("click", function (event) {
-      event.stopPropagation();
-    });
-  });
+  }
 
   filterControls.forEach(function (control) {
     // Debounce free-text inputs to avoid running expensive filtering on every keystroke.
@@ -201,20 +140,13 @@
     }
   });
 
-  document.addEventListener("pointerdown", function (event) {
-    if (!table.contains(event.target)) {
-      closeOpenMenu();
-      return;
-    }
+  if (clearAllButton) {
+    clearAllButton.addEventListener("click", function () {
+      filterControls.forEach(function (control) {
+        control.field.value = "";
+      });
+      applyFilters();
+    });
+  }
 
-    if (!event.target.closest("[data-case-filter-shell]")) {
-      closeOpenMenu();
-    }
-  });
-
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") {
-      closeOpenMenu();
-    }
-  });
 })();

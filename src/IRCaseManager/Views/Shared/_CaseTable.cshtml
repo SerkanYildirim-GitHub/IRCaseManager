@@ -5,125 +5,81 @@
     var caseTypes = Model.Select(irCase => irCase.CaseType.GetDisplayName()).Distinct().OrderBy(value => value).ToList();
     var severities = Model.Select(irCase => irCase.Severity.ToString()).Distinct().OrderBy(value => value).ToList();
     var assignedToValues = Model.Select(GetAssignedToDisplayName).Distinct().OrderBy(value => value).ToList();
+    var teams = Model.Select(irCase => irCase.AssignedTeam).Distinct().OrderBy(value => value).ToList();
     var statuses = Model.Select(irCase => irCase.Status.ToString()).Distinct().OrderBy(value => value).ToList();
 }
 
 <div class="table-wrap">
+    <div class="case-filter-bar" data-case-filter-bar>
+        <div class="case-filter-field">
+            <label for="case-filter-date">Date</label>
+            <input id="case-filter-date" type="date" data-case-filter="date" />
+        </div>
+        <div class="case-filter-field">
+            <label for="case-filter-type">Type</label>
+            <select id="case-filter-type" data-case-filter="type">
+                <option value="">All</option>
+                @foreach (var caseType in caseTypes)
+                {
+                    <option value="@caseType">@caseType</option>
+                }
+            </select>
+        </div>
+        <div class="case-filter-field">
+            <label for="case-filter-severity">Severity</label>
+            <select id="case-filter-severity" data-case-filter="severity">
+                <option value="">All</option>
+                @foreach (var severity in severities)
+                {
+                    <option value="@severity">@severity</option>
+                }
+            </select>
+        </div>
+        <div class="case-filter-field">
+            <label for="case-filter-assigned">Assigned to</label>
+            <select id="case-filter-assigned" data-case-filter="assigned-to">
+                <option value="">All</option>
+                @foreach (var assignedTo in assignedToValues)
+                {
+                    <option value="@assignedTo">@assignedTo</option>
+                }
+            </select>
+        </div>
+        <div class="case-filter-field">
+            <label for="case-filter-team">Team</label>
+            <select id="case-filter-team" data-case-filter="team">
+                <option value="">All</option>
+                @foreach (var team in teams)
+                {
+                    <option value="@team">@team</option>
+                }
+            </select>
+        </div>
+        <div class="case-filter-field">
+            <label for="case-filter-status">Status</label>
+            <select id="case-filter-status" data-case-filter="status">
+                <option value="">All</option>
+                @foreach (var status in statuses)
+                {
+                    <option value="@status">@status</option>
+                }
+            </select>
+        </div>
+        <button class="button button-secondary button-compact" type="button" data-case-filter-clear-all>Clear</button>
+        <span class="case-filter-count muted" data-case-filter-count>Showing @Model.Count of @Model.Count cases</span>
+    </div>
+
     <table class="case-table" data-case-filter-table>
         <thead>
             <tr>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Date</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-date">Filter by date</label>
-                            <input id="case-filter-date" type="search" data-case-filter="date" aria-label="Filter by date" />
-                        </div>
-                    </div>
-                </th>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Case ID</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-id">Filter by Case ID</label>
-                            <input id="case-filter-id" type="search" data-case-filter="case-id" aria-label="Filter by Case ID" />
-                        </div>
-                    </div>
-                </th>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Title</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-title">Filter by title</label>
-                            <input id="case-filter-title" type="search" data-case-filter="title" aria-label="Filter by title" />
-                        </div>
-                    </div>
-                </th>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Type</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-type">Filter by type</label>
-                            <select id="case-filter-type" data-case-filter="type" aria-label="Filter by type">
-                                <option value="">All</option>
-                                @foreach (var caseType in caseTypes)
-                                {
-                                    <option value="@caseType">@caseType</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-                </th>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Severity</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-severity">Filter by severity</label>
-                            <select id="case-filter-severity" data-case-filter="severity" aria-label="Filter by severity">
-                                <option value="">All</option>
-                                @foreach (var severity in severities)
-                                {
-                                    <option value="@severity">@severity</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-                </th>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Assigned to</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-assigned">Filter by assigned analyst</label>
-                            <select id="case-filter-assigned" data-case-filter="assigned-to" aria-label="Filter by assigned analyst">
-                                <option value="">All</option>
-                                @foreach (var assignedTo in assignedToValues)
-                                {
-                                    <option value="@assignedTo">@assignedTo</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-                </th>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Team</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-team">Filter by team</label>
-                            <input id="case-filter-team" type="search" data-case-filter="team" aria-label="Filter by team" />
-                        </div>
-                    </div>
-                </th>
-                <th>
-                    <div class="header-filter" data-case-filter-shell>
-                        <button class="header-filter-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-case-filter-toggle>
-                            <span>Status</span><span class="header-filter-caret" aria-hidden="true"></span>
-                        </button>
-                        <div class="header-filter-menu" hidden data-case-filter-menu>
-                            <label class="sr-only" for="case-filter-status">Filter by status</label>
-                            <select id="case-filter-status" data-case-filter="status" aria-label="Filter by status">
-                                <option value="">All</option>
-                                @foreach (var status in statuses)
-                                {
-                                    <option value="@status">@status</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-                </th>
+                <th>Date</th>
+                <th>Case ID</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Assigned to</th>
+                <th>Team</th>
+                <th>Status</th>
                 <th><span class="sr-only">Actions</span></th>
             </tr>
         </thead>
@@ -131,12 +87,11 @@
             @foreach (var irCase in Model)
             {
                 var openedDate = irCase.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+                var openedDateOnly = irCase.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd");
                 var caseType = irCase.CaseType.GetDisplayName();
                 var assignedTo = GetAssignedToDisplayName(irCase);
                 <tr data-case-row
-                    data-filter-date="@openedDate"
-                    data-filter-case-id="@irCase.CaseId"
-                    data-filter-title="@irCase.Title"
+                    data-filter-date="@openedDateOnly"
                     data-filter-type="@caseType"
                     data-filter-severity="@irCase.Severity"
                     data-filter-assigned-to="@assignedTo"

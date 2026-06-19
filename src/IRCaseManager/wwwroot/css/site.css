@@ -145,17 +145,11 @@ table { width: 100%; border-collapse: collapse; }
 th, td { padding: 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
 th { color: var(--muted); font-size: 0.82rem; text-transform: uppercase; }
 .case-table { min-width: 1120px; }
-.case-table th { position: relative; }
-.header-filter { position: relative; display: inline-flex; }
-.header-filter-button { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 0.82rem; font-weight: 800; text-transform: uppercase; cursor: pointer; }
-.header-filter-button:hover, .header-filter-button.is-active { color: var(--primary); }
-.header-filter-caret { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; }
-.header-filter.is-open .header-filter-caret { transform: rotate(180deg); }
-.header-filter-button.is-active::after { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
-.header-filter-menu { position: absolute; z-index: 10; top: calc(100% + 6px); left: 0; min-width: 210px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 20px rgba(23, 32, 51, 0.12); text-transform: none; pointer-events: auto; }
-.header-filter-menu[hidden] { display: none; pointer-events: none; }
-.case-table th:nth-last-child(-n+3) .header-filter-menu { right: 0; left: auto; }
-.header-filter-menu input, .header-filter-menu select { min-width: 188px; padding: 8px 10px; font-size: 0.92rem; }
+.case-filter-bar { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-strong); }
+.case-filter-field { display: grid; gap: 5px; min-width: 150px; }
+.case-filter-field label { color: var(--muted); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
+.case-filter-field input, .case-filter-field select { min-height: 36px; padding: 7px 9px; font-size: 0.92rem; }
+.case-filter-count { align-self: center; margin-left: auto; font-size: 0.9rem; font-weight: 700; white-space: nowrap; }
 .case-filter-empty { margin-top: 16px; }
 .button-compact { min-height: 32px; padding: 0 10px; font-size: 0.88rem; }
 .button:disabled { border-color: var(--border); background: var(--surface-strong); color: var(--muted); cursor: not-allowed; filter: none; }
