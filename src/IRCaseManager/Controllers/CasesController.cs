@@ -391,14 +391,31 @@ public class CasesController(
                 (applicationUser.Role.Name == RoleNames.AnalystLevel1 ||
                  applicationUser.Role.Name == RoleNames.AnalystLevel2))
             .OrderBy(applicationUser => applicationUser.UserName)
-            .Select(applicationUser => new SelectListItem
+            .Select(applicationUser => new
             {
-                Value = applicationUser.Id.ToString(),
-                Text = applicationUser.UserName
+                applicationUser.Id,
+                applicationUser.UserName,
+                RoleName = applicationUser.Role!.Name
             })
             .ToListAsync();
 
-        ViewBag.AssignedUserOptions = users;
+        ViewBag.AssignedUserOptions = users
+            .Select(applicationUser => new SelectListItem
+            {
+                Value = applicationUser.Id.ToString(),
+                Text = GetAssignedUserOptionText(applicationUser.UserName, applicationUser.RoleName)
+            })
+            .ToList();
+    }
+
+    private static string GetAssignedUserOptionText(string userName, string roleName)
+    {
+        return userName switch
+        {
+            "analyst.l1.local" => RoleNames.AnalystLevel1,
+            "analyst.l2.local" => RoleNames.AnalystLevel2,
+            _ => $"{userName} ({roleName})"
+        };
     }
 
     private static string GenerateSourceReference(string caseId)

@@ -16,6 +16,7 @@ public static class SeedData
         await db.Database.EnsureCreatedAsync();
         await SeedRolesAsync(db);
         await SeedDevelopmentAdminAsync(db, configuration, logger);
+        await SeedDevelopmentAnalystPlaceholdersAsync(db);
     }
 
     private static async Task SeedRolesAsync(AppDbContext db)
@@ -81,5 +82,70 @@ public static class SeedData
 
         await db.SaveChangesAsync();
         logger.LogInformation("Development-only Admin user seeded as admin.local.");
+    }
+
+    private static async Task SeedDevelopmentAnalystPlaceholdersAsync(AppDbContext db)
+    {
+        var analystRoles = await db.Roles
+            .Where(role => role.Name == RoleNames.AnalystLevel1 || role.Name == RoleNames.AnalystLevel2)
+            .ToDictionaryAsync(role => role.Name, role => role.Id);
+
+        var existingUserNames = await db.Users
+            .Where(user => user.UserName == "analyst.l1.local" || user.UserName == "analyst.l2.local")
+            .Select(user => user.UserName)
+            .ToListAsync();
+
+        var placeholderUsers = new List<ApplicationUser>();
+
+        if (!existingUserNames.Contains("analyst.l1.local") &&
+            analystRoles.TryGetValue(RoleNames.AnalystLevel1, out var analystLevel1RoleId))
+        {
+            placeholderUsers.Add(CreateDevelopmentPlaceholderUser(
+                "analyst.l1.local",
+                "analyst.l1.local@example.invalid",
+                analystLevel1RoleId));
+        }
+
+        if (!existingUserNames.Contains("analyst.l2.local") &&
+            analystRoles.TryGetValue(RoleNames.AnalystLevel2, out var analystLevel2RoleId))
+        {
+            placeholderUsers.Add(CreateDevelopmentPlaceholderUser(
+                "analyst.l2.local",
+                "analyst.l2.local@example.invalid",
+                analystLevel2RoleId));
+        }
+
+        if (placeholderUsers.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var placeholderUser in placeholderUsers)
+        {
+            db.Users.Add(placeholderUser);
+            db.AuditLogs.Add(new AuditLog
+            {
+                Action = "DevelopmentAnalystSeeded",
+                EntityType = nameof(ApplicationUser),
+                EntityId = placeholderUser.UserName,
+                Summary = "Development-only analyst placeholder user created for local case assignment testing."
+            });
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    private static ApplicationUser CreateDevelopmentPlaceholderUser(string userName, string email, int roleId)
+    {
+        var user = new ApplicationUser
+        {
+            UserName = userName,
+            Email = email,
+            RoleId = roleId,
+            IsActive = true
+        };
+
+        user.PasswordHash = new PasswordHasher<ApplicationUser>().HashPassword(user, Guid.NewGuid().ToString("N"));
+        return user;
     }
 }
