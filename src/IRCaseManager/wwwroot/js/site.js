@@ -41,10 +41,47 @@
 
   const filters = Array.from(table.querySelectorAll("[data-case-filter]"));
   const rows = Array.from(table.querySelectorAll("[data-case-row]"));
+  const shells = Array.from(table.querySelectorAll("[data-case-filter-shell]"));
   const emptyState = document.querySelector("[data-case-filter-empty]");
 
   function normalize(value) {
     return (value || "").trim().toLowerCase();
+  }
+
+  function toDatasetKey(key) {
+    return "filter" + key.replace(/(^|-)([a-z])/g, function (_, _separator, letter) {
+      return letter.toUpperCase();
+    });
+  }
+
+  function closeMenus(exceptShell) {
+    shells.forEach(function (shell) {
+      if (shell === exceptShell) {
+        return;
+      }
+
+      const button = shell.querySelector("[data-case-filter-toggle]");
+      const menu = shell.querySelector("[data-case-filter-menu]");
+      shell.classList.remove("is-open");
+      if (button) {
+        button.setAttribute("aria-expanded", "false");
+      }
+      if (menu) {
+        menu.hidden = true;
+      }
+    });
+  }
+
+  function updateActiveHeaders() {
+    shells.forEach(function (shell) {
+      const filter = shell.querySelector("[data-case-filter]");
+      const button = shell.querySelector("[data-case-filter-toggle]");
+      const isActive = filter && normalize(filter.value).length > 0;
+      shell.classList.toggle("is-active", Boolean(isActive));
+      if (button) {
+        button.classList.toggle("is-active", Boolean(isActive));
+      }
+    });
   }
 
   function applyFilters() {
@@ -63,9 +100,7 @@
 
     rows.forEach(function (row) {
       const isVisible = activeFilters.every(function (filter) {
-        return normalize(row.dataset["filter" + filter.key.replace(/(^|-)([a-z])/g, function (_, _separator, letter) {
-          return letter.toUpperCase();
-        })]).includes(filter.value);
+        return normalize(row.dataset[toDatasetKey(filter.key)]).includes(filter.value);
       });
 
       row.hidden = !isVisible;
@@ -77,10 +112,51 @@
     if (emptyState) {
       emptyState.hidden = visibleCount > 0;
     }
+
+    updateActiveHeaders();
   }
+
+  shells.forEach(function (shell) {
+    const button = shell.querySelector("[data-case-filter-toggle]");
+    const menu = shell.querySelector("[data-case-filter-menu]");
+    const field = shell.querySelector("[data-case-filter]");
+
+    if (!button || !menu) {
+      return;
+    }
+
+    button.addEventListener("click", function () {
+      const isOpening = menu.hidden;
+      closeMenus(shell);
+      shell.classList.toggle("is-open", isOpening);
+      menu.hidden = !isOpening;
+      button.setAttribute("aria-expanded", String(isOpening));
+
+      if (isOpening && field) {
+        field.focus();
+      }
+    });
+  });
 
   filters.forEach(function (filter) {
     filter.addEventListener("input", applyFilters);
     filter.addEventListener("change", applyFilters);
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!table.contains(event.target)) {
+      closeMenus();
+      return;
+    }
+
+    if (!event.target.closest("[data-case-filter-shell]")) {
+      closeMenus();
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeMenus();
+    }
   });
 })();
