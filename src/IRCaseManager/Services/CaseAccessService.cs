@@ -16,13 +16,6 @@ public class CaseAccessService
         "All"
     ];
 
-    private static readonly string[] AuditorVisibleValues =
-    [
-        "Auditor",
-        "Auditable",
-        "All"
-    ];
-
     public IQueryable<Case> FilterVisibleCases(IQueryable<Case> cases, ClaimsPrincipal user)
     {
         var userId = user.GetUserId();
@@ -55,7 +48,7 @@ public class CaseAccessService
 
         if (user.IsInRole(RoleNames.Auditor))
         {
-            return cases.Where(caseRecord => AuditorVisibleValues.Contains(caseRecord.Visibility));
+            return cases.Where(caseRecord => caseRecord.Status == CaseStatus.Closed);
         }
 
         return cases.Where(_ => false);
