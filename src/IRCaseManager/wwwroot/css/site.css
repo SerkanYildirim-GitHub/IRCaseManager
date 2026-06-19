@@ -117,8 +117,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .metric { padding: 18px; border-left: 6px solid var(--primary); }
 .metric span, .metric strong { display: block; }
 .metric strong { margin-top: 8px; font-size: 2rem; }
-.metric-breakdown { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 12px; color: var(--muted); font-size: 0.86rem; font-weight: 700; }
-.metric-breakdown span { display: inline; white-space: nowrap; }
+.metric-breakdown { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; margin-top: 12px; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+.metric-breakdown span { min-width: 0; }
+.metric-breakdown strong { margin: 0; color: var(--text); font-size: 0.82rem; text-align: right; }
 .metric-critical { border-left-color: #dc2626; }
 .metric-waiting { border-left-color: #d97706; }
 .metric-closed { border-left-color: #16a34a; }
