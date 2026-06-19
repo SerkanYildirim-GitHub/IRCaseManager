@@ -15,9 +15,16 @@ public class DashboardController(AppDbContext db) : Controller
         var cases = db.Cases.AsNoTracking();
 
         ViewBag.TotalCases = await cases.CountAsync();
-        ViewBag.CriticalCases = await cases.CountAsync(irCase => irCase.Severity == CaseSeverity.Critical && irCase.Status != CaseStatus.Closed);
+        ViewBag.NewCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.New);
+        ViewBag.AssignedCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.Assigned);
+        ViewBag.EscalatedCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.Escalated);
         ViewBag.WaitingCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.Waiting);
         ViewBag.ClosedCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.Closed);
+        ViewBag.CriticalCases = await cases.CountAsync(irCase => irCase.Severity == CaseSeverity.Critical);
+        ViewBag.HighCases = await cases.CountAsync(irCase => irCase.Severity == CaseSeverity.High);
+        ViewBag.MediumCases = await cases.CountAsync(irCase => irCase.Severity == CaseSeverity.Medium);
+        ViewBag.LowCases = await cases.CountAsync(irCase => irCase.Severity == CaseSeverity.Low);
+        ViewBag.InformationalCases = await cases.CountAsync(irCase => irCase.Severity == CaseSeverity.Informational);
 
         var visibleCaseSet = await cases
             .OrderByDescending(irCase => irCase.Id)

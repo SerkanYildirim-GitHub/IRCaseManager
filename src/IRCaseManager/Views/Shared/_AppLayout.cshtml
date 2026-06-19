@@ -19,25 +19,27 @@
             <nav class="nav-section">
                 <a asp-controller="Dashboard" asp-action="Index">Dashboard</a>
                 <a asp-controller="Cases" asp-action="Index">Cases</a>
-                <a asp-controller="Resources" asp-action="Index">Resources</a>
+                <details class="nav-dropdown">
+                    <summary>Resources</summary>
+                    <div>
+                        <a href="https://attack.mitre.org/" target="_blank" rel="noopener noreferrer">MITRE ATT&amp;CK</a>
+                        <a href="https://www.nist.gov/cyberframework" target="_blank" rel="noopener noreferrer">NIST CSF</a>
+                        <a href="https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final" target="_blank" rel="noopener noreferrer">NIST IR Guidance</a>
+                        <a href="https://www.cisecurity.org/controls" target="_blank" rel="noopener noreferrer">CIS Controls</a>
+                    </div>
+                </details>
             </nav>
-            <div class="resources-nav">
-                <p>Resources</p>
-                <a href="https://attack.mitre.org/" target="_blank" rel="noopener noreferrer">MITRE ATT&amp;CK</a>
-                <a href="https://www.nist.gov/cyberframework" target="_blank" rel="noopener noreferrer">NIST CSF</a>
-                <a href="https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final" target="_blank" rel="noopener noreferrer">NIST IR Guidance</a>
-                <a href="https://www.cisecurity.org/controls" target="_blank" rel="noopener noreferrer">CIS Controls</a>
-            </div>
         </aside>
 
         <div class="main-region">
             <header class="topbar">
                 <div>
-                    <p class="eyebrow">Secure local foundation</p>
                     <h1>@ViewData["Title"]</h1>
                 </div>
                 <div class="user-actions">
-                    <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
+                    <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false">
+                        <span data-theme-label>Dark</span>
+                    </button>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
                         <a asp-controller="Account" asp-action="Profile">@User.Identity.Name</a>
