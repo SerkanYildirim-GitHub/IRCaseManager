@@ -15,8 +15,7 @@ public static class SeedData
 
         await db.Database.EnsureCreatedAsync();
         await SeedRolesAsync(db);
-        await SeedDevelopmentAdminAsync(db, configuration, logger);
-        await SeedDevelopmentAnalystPlaceholdersAsync(db);
+        await SeedDevelopmentTestUsersAsync(db, logger);
     }
 
     private static async Task SeedRolesAsync(AppDbContext db)
@@ -42,110 +41,97 @@ public static class SeedData
         await db.SaveChangesAsync();
     }
 
-    private static async Task SeedDevelopmentAdminAsync(AppDbContext db, IConfiguration configuration, ILogger logger)
+    private static async Task SeedDevelopmentTestUsersAsync(AppDbContext db, ILogger logger)
     {
-        if (await db.Users.AnyAsync())
+        var testPassword = Environment.GetEnvironmentVariable("IRCASEMANAGER_DEV_TEST_PASSWORD");
+        if (string.IsNullOrWhiteSpace(testPassword))
         {
+            testPassword = Environment.GetEnvironmentVariable("IRCASEMANAGER_DEV_ADMIN_PASSWORD");
+        }
+
+        if (string.IsNullOrWhiteSpace(testPassword))
+        {
+            logger.LogWarning("Development test user seed skipped. Set IRCASEMANAGER_DEV_TEST_PASSWORD or IRCASEMANAGER_DEV_ADMIN_PASSWORD before running in Development.");
             return;
         }
 
-        var adminPassword = Environment.GetEnvironmentVariable("IRCASEMANAGER_DEV_ADMIN_PASSWORD");
-        if (string.IsNullOrWhiteSpace(adminPassword))
+        var roles = await db.Roles.ToDictionaryAsync(role => role.Name, role => role.Id);
+        var passwordHasher = new PasswordHasher<ApplicationUser>();
+        var testUsers = new[]
         {
-            adminPassword = configuration["DevelopmentSeed:AdminPassword"];
-        }
-
-        if (string.IsNullOrWhiteSpace(adminPassword))
-        {
-            logger.LogWarning("Development Admin seed skipped. Set IRCASEMANAGER_DEV_ADMIN_PASSWORD before first run to create the local development Admin user.");
-            return;
-        }
-
-        var adminRole = await db.Roles.SingleAsync(role => role.Name == RoleNames.Admin);
-        var admin = new ApplicationUser
-        {
-            UserName = "admin.local",
-            Email = "admin.local@example.invalid",
-            RoleId = adminRole.Id,
-            IsActive = true
+            new DevelopmentTestUser("admin.local", "admin.local@example.invalid", RoleNames.Admin),
+            new DevelopmentTestUser("analyst.l1.local", "analyst.l1.local@example.invalid", RoleNames.AnalystLevel1),
+            new DevelopmentTestUser("analyst.l2.local", "analyst.l2.local@example.invalid", RoleNames.AnalystLevel2),
+            new DevelopmentTestUser("auditor.local", "auditor.local@example.invalid", RoleNames.Auditor)
         };
 
-        admin.PasswordHash = new PasswordHasher<ApplicationUser>().HashPassword(admin, adminPassword);
-        db.Users.Add(admin);
+        foreach (var testUser in testUsers)
+        {
+            if (!roles.TryGetValue(testUser.RoleName, out var roleId))
+            {
+                continue;
+            }
+
+            var existingUser = await db.Users.SingleOrDefaultAsync(user => user.UserName == testUser.UserName);
+            if (existingUser is null)
+            {
+                var user = new ApplicationUser
+                {
+                    UserName = testUser.UserName,
+                    Email = testUser.Email,
+                    RoleId = roleId,
+                    IsActive = true
+                };
+
+                user.PasswordHash = passwordHasher.HashPassword(user, testPassword);
+                db.Users.Add(user);
+                AddDevelopmentUserAuditLog(db, user.UserName, "DevelopmentTestUserSeeded", "Development-only local test user created.");
+                continue;
+            }
+
+            existingUser.Email = testUser.Email;
+            existingUser.RoleId = roleId;
+            existingUser.IsActive = true;
+
+            if (await ShouldUpgradeOldAnalystPlaceholderPasswordAsync(db, existingUser.UserName))
+            {
+                existingUser.PasswordHash = passwordHasher.HashPassword(existingUser, testPassword);
+                AddDevelopmentUserAuditLog(db, existingUser.UserName, "DevelopmentTestUserPasswordSet", "Development-only local test user password hash set from environment configuration.");
+            }
+        }
+
+        await db.SaveChangesAsync();
+        logger.LogInformation("Development-only local test users are available for role access testing.");
+    }
+
+    private static async Task<bool> ShouldUpgradeOldAnalystPlaceholderPasswordAsync(AppDbContext db, string userName)
+    {
+        var wasOldPlaceholder = await db.AuditLogs.AnyAsync(auditLog =>
+            auditLog.Action == "DevelopmentAnalystSeeded" &&
+            auditLog.EntityId == userName);
+
+        if (!wasOldPlaceholder)
+        {
+            return false;
+        }
+
+        var alreadyUpgraded = await db.AuditLogs.AnyAsync(auditLog =>
+            auditLog.Action == "DevelopmentTestUserPasswordSet" &&
+            auditLog.EntityId == userName);
+
+        return !alreadyUpgraded;
+    }
+
+    private static void AddDevelopmentUserAuditLog(AppDbContext db, string userName, string action, string summary)
+    {
         db.AuditLogs.Add(new AuditLog
         {
-            Action = "DevelopmentAdminSeeded",
+            Action = action,
             EntityType = nameof(ApplicationUser),
-            EntityId = admin.UserName,
-            Summary = "Development-only local Admin account created."
+            EntityId = userName,
+            Summary = summary
         });
-
-        await db.SaveChangesAsync();
-        logger.LogInformation("Development-only Admin user seeded as admin.local.");
     }
 
-    private static async Task SeedDevelopmentAnalystPlaceholdersAsync(AppDbContext db)
-    {
-        var analystRoles = await db.Roles
-            .Where(role => role.Name == RoleNames.AnalystLevel1 || role.Name == RoleNames.AnalystLevel2)
-            .ToDictionaryAsync(role => role.Name, role => role.Id);
-
-        var existingUserNames = await db.Users
-            .Where(user => user.UserName == "analyst.l1.local" || user.UserName == "analyst.l2.local")
-            .Select(user => user.UserName)
-            .ToListAsync();
-
-        var placeholderUsers = new List<ApplicationUser>();
-
-        if (!existingUserNames.Contains("analyst.l1.local") &&
-            analystRoles.TryGetValue(RoleNames.AnalystLevel1, out var analystLevel1RoleId))
-        {
-            placeholderUsers.Add(CreateDevelopmentPlaceholderUser(
-                "analyst.l1.local",
-                "analyst.l1.local@example.invalid",
-                analystLevel1RoleId));
-        }
-
-        if (!existingUserNames.Contains("analyst.l2.local") &&
-            analystRoles.TryGetValue(RoleNames.AnalystLevel2, out var analystLevel2RoleId))
-        {
-            placeholderUsers.Add(CreateDevelopmentPlaceholderUser(
-                "analyst.l2.local",
-                "analyst.l2.local@example.invalid",
-                analystLevel2RoleId));
-        }
-
-        if (placeholderUsers.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var placeholderUser in placeholderUsers)
-        {
-            db.Users.Add(placeholderUser);
-            db.AuditLogs.Add(new AuditLog
-            {
-                Action = "DevelopmentAnalystSeeded",
-                EntityType = nameof(ApplicationUser),
-                EntityId = placeholderUser.UserName,
-                Summary = "Development-only analyst placeholder user created for local case assignment testing."
-            });
-        }
-
-        await db.SaveChangesAsync();
-    }
-
-    private static ApplicationUser CreateDevelopmentPlaceholderUser(string userName, string email, int roleId)
-    {
-        var user = new ApplicationUser
-        {
-            UserName = userName,
-            Email = email,
-            RoleId = roleId,
-            IsActive = true
-        };
-
-        user.PasswordHash = new PasswordHasher<ApplicationUser>().HashPassword(user, Guid.NewGuid().ToString("N"));
-        return user;
-    }
+    private sealed record DevelopmentTestUser(string UserName, string Email, string RoleName);
 }
