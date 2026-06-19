@@ -32,3 +32,55 @@
     });
   }
 })();
+
+(function () {
+  const table = document.querySelector("[data-case-filter-table]");
+  if (!table) {
+    return;
+  }
+
+  const filters = Array.from(table.querySelectorAll("[data-case-filter]"));
+  const rows = Array.from(table.querySelectorAll("[data-case-row]"));
+  const emptyState = document.querySelector("[data-case-filter-empty]");
+
+  function normalize(value) {
+    return (value || "").trim().toLowerCase();
+  }
+
+  function applyFilters() {
+    const activeFilters = filters
+      .map(function (filter) {
+        return {
+          key: filter.dataset.caseFilter,
+          value: normalize(filter.value)
+        };
+      })
+      .filter(function (filter) {
+        return filter.value.length > 0;
+      });
+
+    let visibleCount = 0;
+
+    rows.forEach(function (row) {
+      const isVisible = activeFilters.every(function (filter) {
+        return normalize(row.dataset["filter" + filter.key.replace(/(^|-)([a-z])/g, function (_, _separator, letter) {
+          return letter.toUpperCase();
+        })]).includes(filter.value);
+      });
+
+      row.hidden = !isVisible;
+      if (isVisible) {
+        visibleCount += 1;
+      }
+    });
+
+    if (emptyState) {
+      emptyState.hidden = visibleCount > 0;
+    }
+  }
+
+  filters.forEach(function (filter) {
+    filter.addEventListener("input", applyFilters);
+    filter.addEventListener("change", applyFilters);
+  });
+})();

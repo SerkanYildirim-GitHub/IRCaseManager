@@ -23,6 +23,8 @@ public class CasesController(
         var visibleCaseSet = await caseAccessService
             .FilterVisibleCases(db.Cases.AsNoTracking(), User)
             .Include(irCase => irCase.CreatedBy)
+            .Include(irCase => irCase.Assignments)
+                .ThenInclude(assignment => assignment.ApplicationUser)
             .ToListAsync();
 
         var cases = visibleCaseSet

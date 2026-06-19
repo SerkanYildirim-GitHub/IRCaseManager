@@ -1,22 +1,79 @@
 @model IReadOnlyList<Case>
+@{
+    var canShowEditPlaceholder = User.IsInRole(RoleNames.Admin)
+        || User.IsInRole(RoleNames.AnalystLevel1)
+        || User.IsInRole(RoleNames.AnalystLevel2);
+}
 
 <div class="table-wrap">
-    <table>
+    <table class="case-table" data-case-filter-table>
         <thead>
             <tr>
+                <th>Date</th>
                 <th>Case ID</th>
                 <th>Title</th>
-                <th>Severity</th>
-                <th>Status</th>
                 <th>Type</th>
+                <th>Severity</th>
+                <th>Assigned to</th>
                 <th>Team</th>
-                <th>Opened</th>
+                <th>Status</th>
+                <th>Edit</th>
+            </tr>
+            <tr class="filter-row">
+                <th><label class="sr-only" for="case-filter-date">Filter by date</label><input id="case-filter-date" type="search" data-case-filter="date" aria-label="Filter by date" /></th>
+                <th><label class="sr-only" for="case-filter-id">Filter by Case ID</label><input id="case-filter-id" type="search" data-case-filter="case-id" aria-label="Filter by Case ID" /></th>
+                <th><label class="sr-only" for="case-filter-title">Filter by title</label><input id="case-filter-title" type="search" data-case-filter="title" aria-label="Filter by title" /></th>
+                <th>
+                    <label class="sr-only" for="case-filter-type">Filter by type</label>
+                    <select id="case-filter-type" data-case-filter="type" aria-label="Filter by type">
+                        <option value="">All</option>
+                        @foreach (var caseType in Model.Select(irCase => irCase.CaseType.GetDisplayName()).Distinct().OrderBy(value => value))
+                        {
+                            <option value="@caseType">@caseType</option>
+                        }
+                    </select>
+                </th>
+                <th>
+                    <label class="sr-only" for="case-filter-severity">Filter by severity</label>
+                    <select id="case-filter-severity" data-case-filter="severity" aria-label="Filter by severity">
+                        <option value="">All</option>
+                        @foreach (var severity in Model.Select(irCase => irCase.Severity.ToString()).Distinct().OrderBy(value => value))
+                        {
+                            <option value="@severity">@severity</option>
+                        }
+                    </select>
+                </th>
+                <th><label class="sr-only" for="case-filter-assigned">Filter by assigned analyst</label><input id="case-filter-assigned" type="search" data-case-filter="assigned-to" aria-label="Filter by assigned analyst" /></th>
+                <th><label class="sr-only" for="case-filter-team">Filter by team</label><input id="case-filter-team" type="search" data-case-filter="team" aria-label="Filter by team" /></th>
+                <th>
+                    <label class="sr-only" for="case-filter-status">Filter by status</label>
+                    <select id="case-filter-status" data-case-filter="status" aria-label="Filter by status">
+                        <option value="">All</option>
+                        @foreach (var status in Model.Select(irCase => irCase.Status.ToString()).Distinct().OrderBy(value => value))
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </th>
+                <th><span class="muted">-</span></th>
             </tr>
         </thead>
         <tbody>
             @foreach (var irCase in Model)
             {
-                <tr>
+                var openedDate = irCase.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+                var caseType = irCase.CaseType.GetDisplayName();
+                var assignedTo = GetAssignedToDisplayName(irCase);
+                <tr data-case-row
+                    data-filter-date="@openedDate"
+                    data-filter-case-id="@irCase.CaseId"
+                    data-filter-title="@irCase.Title"
+                    data-filter-type="@caseType"
+                    data-filter-severity="@irCase.Severity"
+                    data-filter-assigned-to="@assignedTo"
+                    data-filter-team="@irCase.AssignedTeam"
+                    data-filter-status="@irCase.Status">
+                    <td>@openedDate</td>
                     <td>
                         <a class="case-link" asp-controller="Cases" asp-action="Details" asp-route-id="@irCase.CaseId">
                             <strong>@irCase.CaseId</strong>
@@ -27,13 +84,41 @@
                             @irCase.Title
                         </a>
                     </td>
+                    <td>@caseType</td>
                     <td><span class="badge severity-@irCase.Severity.ToString().ToLowerInvariant()">@irCase.Severity</span></td>
-                    <td><span class="badge status-@irCase.Status.ToString().ToLowerInvariant()">@irCase.Status</span></td>
-                    <td>@irCase.CaseType.GetDisplayName()</td>
+                    <td>@assignedTo</td>
                     <td>@irCase.AssignedTeam</td>
-                    <td>@irCase.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    <td><span class="badge status-@irCase.Status.ToString().ToLowerInvariant()">@irCase.Status</span></td>
+                    <td>
+                        @if (canShowEditPlaceholder)
+                        {
+                            <button class="button button-compact" type="button" disabled title="Edit workflow not available yet">Edit</button>
+                        }
+                        else
+                        {
+                            <span class="muted">Read-only</span>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
+    <p class="empty-state case-filter-empty" data-case-filter-empty hidden>No cases match the current filters.</p>
 </div>
+
+@functions {
+    private static string GetAssignedToDisplayName(Case irCase)
+    {
+        var assignedUserName = irCase.Assignments
+            .Select(assignment => assignment.ApplicationUser?.UserName)
+            .FirstOrDefault(userName => !string.IsNullOrWhiteSpace(userName));
+
+        return assignedUserName switch
+        {
+            null => "Unassigned",
+            "analyst.l1.local" => RoleNames.AnalystLevel1,
+            "analyst.l2.local" => RoleNames.AnalystLevel2,
+            _ => assignedUserName
+        };
+    }
+}
