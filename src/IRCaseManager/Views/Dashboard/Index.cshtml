@@ -26,12 +26,14 @@
     </article>
     <article class="metric metric-neutral metric-total">
         <span>Total</span>
-        <strong>@ViewBag.TotalCases</strong>
-        <div class="metric-breakdown" aria-label="Status breakdown">
-            <span>New</span><strong>@ViewBag.NewCases</strong>
-            <span>Assigned</span><strong>@ViewBag.AssignedCases</strong>
-            <span>Escalated</span><strong>@ViewBag.EscalatedCases</strong>
-            <span>Closed</span><strong>@ViewBag.ClosedCases</strong>
+        <div class="metric-total-body">
+            <strong>@ViewBag.TotalCases</strong>
+            <div class="metric-breakdown" aria-label="Status breakdown">
+                <span>New</span><strong>@ViewBag.NewCases</strong>
+                <span>Assigned</span><strong>@ViewBag.AssignedCases</strong>
+                <span>Escalated</span><strong>@ViewBag.EscalatedCases</strong>
+                <span>Closed</span><strong>@ViewBag.ClosedCases</strong>
+            </div>
         </div>
     </article>
 </section>
