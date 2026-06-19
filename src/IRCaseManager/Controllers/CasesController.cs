@@ -15,12 +15,13 @@ namespace IRCaseManager.Controllers;
 public class CasesController(
     AppDbContext db,
     CaseIdGenerator caseIdGenerator,
-    PlaybookDefinitionService playbookDefinitionService) : Controller
+    PlaybookDefinitionService playbookDefinitionService,
+    CaseAccessService caseAccessService) : Controller
 {
     public async Task<IActionResult> Index()
     {
-        var visibleCaseSet = await db.Cases
-            .AsNoTracking()
+        var visibleCaseSet = await caseAccessService
+            .FilterVisibleCases(db.Cases.AsNoTracking(), User)
             .Include(irCase => irCase.CreatedBy)
             .ToListAsync();
 
@@ -39,8 +40,8 @@ public class CasesController(
             return NotFound();
         }
 
-        var irCase = await db.Cases
-            .AsNoTracking()
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases.AsNoTracking(), User)
             .Include(caseRecord => caseRecord.CreatedBy)
             .Include(caseRecord => caseRecord.Assignments)
                 .ThenInclude(assignment => assignment.ApplicationUser)
@@ -51,7 +52,7 @@ public class CasesController(
 
         if (irCase is null)
         {
-            return NotFound();
+            return await CaseNotFoundOrForbiddenAsync(id);
         }
 
         return View("DetailsWorkspace", BuildWorkspaceViewModel(irCase));
@@ -175,13 +176,14 @@ public class CasesController(
             return Forbid();
         }
 
-        var irCase = await db.Cases
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
             .Include(caseRecord => caseRecord.Assignments)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
 
         if (irCase is null)
         {
-            return NotFound();
+            return await CaseNotFoundOrForbiddenAsync(id);
         }
 
         var userId = User.GetUserId();
@@ -236,13 +238,14 @@ public class CasesController(
             return Forbid();
         }
 
-        var irCase = await db.Cases
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
 
         if (irCase is null)
         {
-            return NotFound();
+            return await CaseNotFoundOrForbiddenAsync(id);
         }
 
         var definition = playbookDefinitionService
@@ -303,16 +306,18 @@ public class CasesController(
 
         model.Trim();
 
-        var irCase = await db.Cases.SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
         if (irCase is null)
         {
-            return NotFound();
+            return await CaseNotFoundOrForbiddenAsync(id);
         }
 
         if (!ModelState.IsValid)
         {
-            var reloadedCase = await db.Cases
-                .AsNoTracking()
+            var reloadedCase = await caseAccessService
+                .FilterVisibleCases(db.Cases.AsNoTracking(), User)
                 .Include(caseRecord => caseRecord.CreatedBy)
                 .Include(caseRecord => caseRecord.Assignments)
                     .ThenInclude(assignment => assignment.ApplicationUser)
@@ -436,10 +441,12 @@ public class CasesController(
             return NotFound();
         }
 
-        var irCase = await db.Cases.SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
         if (irCase is null)
         {
-            return NotFound();
+            return await CaseNotFoundOrForbiddenAsync(id);
         }
 
         var userId = User.GetUserId();
@@ -466,6 +473,17 @@ public class CasesController(
         await db.SaveChangesAsync();
         TempData["StatusMessage"] = $"{summary.TrimEnd('.')} {irCase.CaseId}.";
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
+    private async Task<IActionResult> CaseNotFoundOrForbiddenAsync(string id)
+    {
+        if (!string.IsNullOrWhiteSpace(id) &&
+            await db.Cases.AsNoTracking().AnyAsync(caseRecord => caseRecord.CaseId == id))
+        {
+            return Forbid();
+        }
+
+        return NotFound();
     }
 
     private bool CanCloseCase()

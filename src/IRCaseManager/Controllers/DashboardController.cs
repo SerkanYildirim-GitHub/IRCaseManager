@@ -1,6 +1,7 @@
 using IRCaseManager.Data;
 using IRCaseManager.Models;
 using IRCaseManager.Security;
+using IRCaseManager.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,11 +9,11 @@ using Microsoft.EntityFrameworkCore;
 namespace IRCaseManager.Controllers;
 
 [Authorize(Policy = AuthorizationPolicies.ReadOnlyAccess)]
-public class DashboardController(AppDbContext db) : Controller
+public class DashboardController(AppDbContext db, CaseAccessService caseAccessService) : Controller
 {
     public async Task<IActionResult> Index()
     {
-        var cases = db.Cases.AsNoTracking();
+        var cases = caseAccessService.FilterVisibleCases(db.Cases.AsNoTracking(), User);
 
         ViewBag.TotalCases = await cases.CountAsync();
         ViewBag.NewCases = await cases.CountAsync(irCase => irCase.Status == CaseStatus.New);
