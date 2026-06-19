@@ -16,8 +16,14 @@ public class EvidenceMetadata
     [StringLength(80)]
     public string EvidenceType { get; set; } = string.Empty;
 
+    [StringLength(2000)]
+    public string Description { get; set; } = string.Empty;
+
     [StringLength(256)]
     public string Source { get; set; } = string.Empty;
+
+    [StringLength(2000)]
+    public string AnalystNotes { get; set; } = string.Empty;
 
     [StringLength(256)]
     public string StorageReference { get; set; } = string.Empty;

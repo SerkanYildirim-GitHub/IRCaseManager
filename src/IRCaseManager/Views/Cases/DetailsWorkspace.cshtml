@@ -1,0 +1,222 @@
+@model IRCaseManager.ViewModels.CaseWorkspaceViewModel
+@{
+    var caseRecord = Model.Case;
+    ViewData["Title"] = caseRecord.CaseId;
+    var assignedUsers = caseRecord.Assignments
+        .Where(assignment => assignment.ApplicationUser is not null)
+        .Select(assignment => assignment.ApplicationUser!.UserName)
+        .OrderBy(userName => userName)
+        .ToList();
+    var canClose = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2);
+    var canReopen = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel2);
+    var canEscalate = canClose;
+}
+
+<section class="case-heading">
+    <div>
+        <p class="eyebrow">Case Workspace</p>
+        <h2>@caseRecord.Title</h2>
+        <div class="case-meta">
+            <span class="badge severity-@caseRecord.Severity.ToString().ToLowerInvariant()">@caseRecord.Severity</span>
+            <span class="badge status-@caseRecord.Status.ToString().ToLowerInvariant()">@caseRecord.Status</span>
+            <span>@caseRecord.CaseType.GetDisplayName()</span>
+        </div>
+    </div>
+    <div class="case-actions">
+        @if (canEscalate && caseRecord.Status != CaseStatus.Escalated && caseRecord.Status != CaseStatus.Closed)
+        {
+            <form asp-action="Escalate" asp-route-id="@caseRecord.CaseId" method="post">
+                <button class="button button-secondary" type="submit">Escalate</button>
+            </form>
+        }
+        @if (canClose && caseRecord.Status != CaseStatus.Closed)
+        {
+            <form asp-action="Close" asp-route-id="@caseRecord.CaseId" method="post">
+                <button class="button" type="submit">Close Case</button>
+            </form>
+        }
+        @if (canReopen && caseRecord.Status == CaseStatus.Closed)
+        {
+            <form asp-action="Reopen" asp-route-id="@caseRecord.CaseId" method="post">
+                <button class="button" type="submit">Reopen Case</button>
+            </form>
+        }
+        <a class="button button-secondary" asp-action="Index">Back to Cases</a>
+    </div>
+</section>
+
+<section class="case-workspace-layout">
+    <div class="workspace-main">
+        <article class="workspace-section" id="overview">
+            <div class="panel-header">
+                <h2>Overview</h2>
+            </div>
+            <dl class="overview-list">
+                <dt>Case ID</dt>
+                <dd>@caseRecord.CaseId</dd>
+                <dt>Title</dt>
+                <dd>@caseRecord.Title</dd>
+                <dt>Severity</dt>
+                <dd><span class="badge severity-@caseRecord.Severity.ToString().ToLowerInvariant()">@caseRecord.Severity</span></dd>
+                <dt>Status</dt>
+                <dd><span class="badge status-@caseRecord.Status.ToString().ToLowerInvariant()">@caseRecord.Status</span></dd>
+                <dt>Case type</dt>
+                <dd>@caseRecord.CaseType.GetDisplayName()</dd>
+                <dt>Source reference</dt>
+                <dd>@(caseRecord.SourceReference ?? "Not provided")</dd>
+                <dt>Assigned team</dt>
+                <dd>@caseRecord.AssignedTeam</dd>
+                <dt>Assigned user(s)</dt>
+                <dd>@(assignedUsers.Count == 0 ? "No owner selected" : string.Join(", ", assignedUsers))</dd>
+                <dt>Opened</dt>
+                <dd>@caseRecord.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd>
+                <dt>Closed</dt>
+                <dd>@(caseRecord.ClosedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "Open")</dd>
+                <dt>Created by</dt>
+                <dd>@(caseRecord.CreatedBy?.UserName ?? "Unknown")</dd>
+                <dt>Visibility</dt>
+                <dd>@caseRecord.Visibility</dd>
+            </dl>
+            <div class="summary-block">
+                <h3>Initial Summary</h3>
+                <p>@caseRecord.InitialSummary</p>
+            </div>
+        </article>
+
+        <article class="workspace-section" id="evidence">
+            <div class="panel-header">
+                <h2>Evidence</h2>
+            </div>
+            <p class="muted">File attachment will be added in a later secure upload slice.</p>
+            @if (caseRecord.EvidenceItems.Count == 0)
+            {
+                <p class="empty-state">No evidence metadata has been documented yet.</p>
+            }
+            else
+            {
+                <div class="evidence-list">
+                    @foreach (var evidence in caseRecord.EvidenceItems.OrderByDescending(item => item.CollectedAt))
+                    {
+                        <article class="evidence-item">
+                            <div>
+                                <strong>@evidence.Name</strong>
+                                <span>@evidence.EvidenceType</span>
+                            </div>
+                            <dl>
+                                <dt>Source</dt>
+                                <dd>@(string.IsNullOrWhiteSpace(evidence.Source) ? "Not provided" : evidence.Source)</dd>
+                                <dt>Collected</dt>
+                                <dd>@evidence.CollectedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd>
+                                <dt>Description</dt>
+                                <dd>@(string.IsNullOrWhiteSpace(evidence.Description) ? "Not provided" : evidence.Description)</dd>
+                                <dt>Analyst notes</dt>
+                                <dd>@(string.IsNullOrWhiteSpace(evidence.AnalystNotes) ? "Not provided" : evidence.AnalystNotes)</dd>
+                            </dl>
+                        </article>
+                    }
+                </div>
+            }
+
+            @if (Model.CanWorkCase)
+            {
+                <form class="evidence-form" asp-action="AddEvidence" asp-route-id="@caseRecord.CaseId" method="post">
+                    <h3>Add Evidence Metadata</h3>
+                    <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="NewEvidence.EvidenceType"></label>
+                            <input name="EvidenceType" value="@Model.NewEvidence.EvidenceType" maxlength="80" autocomplete="off" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="NewEvidence.Name"></label>
+                            <input name="Name" value="@Model.NewEvidence.Name" maxlength="160" autocomplete="off" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="NewEvidence.Source"></label>
+                            <input name="Source" value="@Model.NewEvidence.Source" maxlength="256" autocomplete="off" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="NewEvidence.CollectedAt"></label>
+                            <input name="CollectedAt" value="@Model.NewEvidence.CollectedAt?.ToString("yyyy-MM-ddTHH:mm:sszzz")" />
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="NewEvidence.Description"></label>
+                            <textarea name="Description" maxlength="2000" rows="4">@Model.NewEvidence.Description</textarea>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="NewEvidence.AnalystNotes"></label>
+                            <textarea name="AnalystNotes" maxlength="2000" rows="4">@Model.NewEvidence.AnalystNotes</textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button" type="submit">Add Evidence</button>
+                    </div>
+                </form>
+            }
+        </article>
+
+        <article class="workspace-section" id="timeline">
+            <div class="panel-header">
+                <h2>Timeline</h2>
+            </div>
+            <p class="empty-state">No timeline entries have been documented yet.</p>
+        </article>
+
+        <article class="workspace-section" id="findings">
+            <div class="panel-header">
+                <h2>Findings / IOCs</h2>
+            </div>
+            <p class="empty-state">No findings, observables, or indicators have been documented yet.</p>
+        </article>
+
+        <article class="workspace-section" id="mitre">
+            <div class="panel-header">
+                <h2>MITRE ATT&amp;CK Mapping</h2>
+            </div>
+            <p class="empty-state">Observed tactics, techniques, and procedures will be documented here as the investigation develops.</p>
+        </article>
+
+        <article class="workspace-section" id="notes">
+            <div class="panel-header">
+                <h2>Notes / Actions</h2>
+            </div>
+            <p class="empty-state">No analyst notes or response actions have been documented yet.</p>
+        </article>
+
+        <article class="workspace-section" id="closure">
+            <div class="panel-header">
+                <h2>Closure Report</h2>
+            </div>
+            <p class="empty-state">The closure report will be generated from documented case data once the case is ready to close.</p>
+        </article>
+    </div>
+
+    <aside class="playbook-sidebar" id="playbook">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">@caseRecord.CaseType.GetDisplayName()</p>
+                <h2>IR Playbook / Runbook</h2>
+            </div>
+        </div>
+        <div class="playbook-steps">
+            @foreach (var step in Model.PlaybookSteps)
+            {
+                <article class="playbook-step @(step.IsCompleted ? "is-complete" : "is-open")">
+                    <form asp-action="TogglePlaybookStep" asp-route-id="@caseRecord.CaseId" method="post">
+                        <input type="hidden" name="stepKey" value="@step.Key" />
+                        <input type="hidden" name="completionState" value="@(step.IsCompleted ? "open" : "complete")" />
+                        <label>
+                            <input type="checkbox" checked="@step.IsCompleted" disabled="@(!Model.CanWorkCase)" onchange="this.form.submit()" />
+                            <span>@step.Title</span>
+                        </label>
+                        <p>@step.Description</p>
+                        @if (!Model.CanWorkCase)
+                        {
+                            <span class="muted">Read-only</span>
+                        }
+                    </form>
+                </article>
+            }
+        </div>
+    </aside>
+</section>

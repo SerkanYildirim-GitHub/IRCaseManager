@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Case> Cases => Set<Case>();
     public DbSet<CaseAssignment> CaseAssignments => Set<CaseAssignment>();
     public DbSet<EvidenceMetadata> EvidenceMetadata => Set<EvidenceMetadata>();
+    public DbSet<CasePlaybookStep> CasePlaybookSteps => Set<CasePlaybookStep>();
     public DbSet<TimelineEntry> TimelineEntries => Set<TimelineEntry>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
@@ -36,6 +37,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<CaseAssignment>()
             .HasKey(assignment => new { assignment.CaseId, assignment.ApplicationUserId });
 
+        modelBuilder.Entity<CasePlaybookStep>()
+            .HasIndex(step => new { step.CaseId, step.StepKey })
+            .IsUnique();
+
         modelBuilder.Entity<CaseAssignment>()
             .HasOne(assignment => assignment.Case)
             .WithMany(irCase => irCase.Assignments)
@@ -59,5 +64,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(irCase => irCase.UpdatedById)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CasePlaybookStep>()
+            .HasOne(step => step.Case)
+            .WithMany(irCase => irCase.PlaybookSteps)
+            .HasForeignKey(step => step.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -12,7 +12,10 @@ using Microsoft.EntityFrameworkCore;
 namespace IRCaseManager.Controllers;
 
 [Authorize(Policy = AuthorizationPolicies.ReadOnlyAccess)]
-public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) : Controller
+public class CasesController(
+    AppDbContext db,
+    CaseIdGenerator caseIdGenerator,
+    PlaybookDefinitionService playbookDefinitionService) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -42,6 +45,7 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
             .Include(caseRecord => caseRecord.Assignments)
                 .ThenInclude(assignment => assignment.ApplicationUser)
             .Include(caseRecord => caseRecord.EvidenceItems)
+            .Include(caseRecord => caseRecord.PlaybookSteps)
             .Include(caseRecord => caseRecord.TimelineEntries)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
 
@@ -50,7 +54,7 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
             return NotFound();
         }
 
-        return View(irCase);
+        return View("DetailsWorkspace", BuildWorkspaceViewModel(irCase));
     }
 
     [Authorize(Policy = AuthorizationPolicies.CanCreateCases)]
@@ -215,6 +219,136 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
         return updateResult;
     }
 
+    [HttpPost]
+    public async Task<IActionResult> TogglePlaybookStep(string id, string stepKey, string? completionState)
+    {
+        if (!CanWorkCase())
+        {
+            return Forbid();
+        }
+
+        var irCase = await db.Cases
+            .Include(caseRecord => caseRecord.PlaybookSteps)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+
+        if (irCase is null)
+        {
+            return NotFound();
+        }
+
+        var definition = playbookDefinitionService
+            .GetSteps(irCase.CaseType)
+            .SingleOrDefault(step => step.Key == stepKey);
+
+        if (definition is null)
+        {
+            return NotFound();
+        }
+
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Challenge();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var completion = irCase.PlaybookSteps.SingleOrDefault(step => step.StepKey == stepKey);
+        if (completion is null)
+        {
+            completion = new CasePlaybookStep
+            {
+                CaseId = irCase.Id,
+                StepKey = stepKey,
+                UpdatedById = userId.Value
+            };
+            db.CasePlaybookSteps.Add(completion);
+        }
+
+        var isCompleted = string.Equals(completionState, "complete", StringComparison.OrdinalIgnoreCase);
+        completion.IsCompleted = isCompleted;
+        completion.CompletedAt = isCompleted ? now : null;
+        completion.CompletedById = isCompleted ? userId.Value : null;
+        completion.UpdatedAt = now;
+        completion.UpdatedById = userId.Value;
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ApplicationUserId = userId,
+            Action = isCompleted ? "PlaybookStepCompleted" : "PlaybookStepReopened",
+            EntityType = nameof(CasePlaybookStep),
+            EntityId = $"{irCase.CaseId}:{stepKey}",
+            Summary = isCompleted ? "Playbook step marked complete." : "Playbook step marked incomplete."
+        });
+
+        await db.SaveChangesAsync();
+        return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> AddEvidence(string id, EvidenceMetadataViewModel model)
+    {
+        if (!CanWorkCase())
+        {
+            return Forbid();
+        }
+
+        model.Trim();
+
+        var irCase = await db.Cases.SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+        if (irCase is null)
+        {
+            return NotFound();
+        }
+
+        if (!ModelState.IsValid)
+        {
+            var reloadedCase = await db.Cases
+                .AsNoTracking()
+                .Include(caseRecord => caseRecord.CreatedBy)
+                .Include(caseRecord => caseRecord.Assignments)
+                    .ThenInclude(assignment => assignment.ApplicationUser)
+                .Include(caseRecord => caseRecord.EvidenceItems)
+                .Include(caseRecord => caseRecord.PlaybookSteps)
+                .Include(caseRecord => caseRecord.TimelineEntries)
+                .SingleAsync(caseRecord => caseRecord.CaseId == id);
+
+            var workspace = BuildWorkspaceViewModel(reloadedCase, model);
+            return View("DetailsWorkspace", workspace);
+        }
+
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Challenge();
+        }
+
+        var evidence = new EvidenceMetadata
+        {
+            CaseId = irCase.Id,
+            EvidenceType = model.EvidenceType,
+            Name = model.Name,
+            Description = model.Description,
+            Source = model.Source,
+            AnalystNotes = model.AnalystNotes,
+            CollectedAt = model.CollectedAt!.Value.ToUniversalTime(),
+            CollectedById = userId.Value
+        };
+
+        db.EvidenceMetadata.Add(evidence);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ApplicationUserId = userId,
+            Action = "EvidenceMetadataAdded",
+            EntityType = nameof(EvidenceMetadata),
+            EntityId = irCase.CaseId,
+            Summary = "Evidence metadata added."
+        });
+
+        await db.SaveChangesAsync();
+        TempData["StatusMessage"] = $"Evidence added to {irCase.CaseId}.";
+        return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
     private async Task PopulateAssignedUserOptionsAsync()
     {
         var users = await db.Users
@@ -293,5 +427,41 @@ public class CasesController(AppDbContext db, CaseIdGenerator caseIdGenerator) :
         return User.IsInRole(RoleNames.Admin)
             || User.IsInRole(RoleNames.AnalystLevel1)
             || User.IsInRole(RoleNames.AnalystLevel2);
+    }
+
+    private bool CanWorkCase()
+    {
+        return User.IsInRole(RoleNames.Admin)
+            || User.IsInRole(RoleNames.AnalystLevel1)
+            || User.IsInRole(RoleNames.AnalystLevel2);
+    }
+
+    private CaseWorkspaceViewModel BuildWorkspaceViewModel(
+        Case irCase,
+        EvidenceMetadataViewModel? newEvidence = null)
+    {
+        var completedSteps = irCase.PlaybookSteps
+            .Where(step => step.IsCompleted)
+            .Select(step => step.StepKey)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var playbookSteps = playbookDefinitionService
+            .GetSteps(irCase.CaseType)
+            .Select(step => new PlaybookStepViewModel
+            {
+                Key = step.Key,
+                Title = step.Title,
+                Description = step.Description,
+                IsCompleted = completedSteps.Contains(step.Key)
+            })
+            .ToList();
+
+        return new CaseWorkspaceViewModel
+        {
+            Case = irCase,
+            PlaybookSteps = playbookSteps,
+            NewEvidence = newEvidence ?? new EvidenceMetadataViewModel(),
+            CanWorkCase = CanWorkCase()
+        };
     }
 }

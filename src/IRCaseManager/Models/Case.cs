@@ -51,4 +51,6 @@ public class Case
     public ICollection<EvidenceMetadata> EvidenceItems { get; set; } = [];
 
     public ICollection<TimelineEntry> TimelineEntries { get; set; } = [];
+
+    public ICollection<CasePlaybookStep> PlaybookSteps { get; set; } = [];
 }
