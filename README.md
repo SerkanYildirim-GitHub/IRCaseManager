@@ -99,4 +99,4 @@ Recommended next engineering priorities:
 
 ## License
 
-Licensing terms have not been finalized.
+All rights reserved. 
