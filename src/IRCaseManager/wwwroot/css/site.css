@@ -212,6 +212,12 @@ textarea { resize: vertical; }
 .evidence-item dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 12px; margin: 0; }
 .evidence-item dt { color: var(--muted); font-weight: 800; }
 .evidence-item dd { margin: 0; white-space: pre-wrap; }
+.timeline-form { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.timeline-entry-list { display: grid; gap: 12px; }
+.timeline-entry-item { padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-strong); }
+.timeline-entry-item > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.timeline-entry-item > div span { color: var(--muted); font-weight: 700; white-space: nowrap; }
+.timeline-entry-item p { margin: 0 0 10px; white-space: pre-wrap; }
 .assignment-history-list { display: grid; gap: 12px; }
 .assignment-history-item { padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-strong); }
 .assignment-history-item > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -241,6 +247,6 @@ textarea { resize: vertical; }
   .playbook-sidebar { position: static; }
   .topbar, .panel-header, .case-heading { align-items: flex-start; flex-direction: column; }
   .overview-list, .evidence-item dl, .assignment-history-item dl, .investigation-details-list { grid-template-columns: 1fr; }
-  .assignment-history-item > div { align-items: flex-start; flex-direction: column; }
+  .assignment-history-item > div, .timeline-entry-item > div { align-items: flex-start; flex-direction: column; }
   .content { width: min(100% - 32px, 1180px); }
 }

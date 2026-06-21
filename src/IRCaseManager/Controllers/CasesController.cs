@@ -50,6 +50,7 @@ public class CasesController(
             .Include(caseRecord => caseRecord.EvidenceItems)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .Include(caseRecord => caseRecord.TimelineEntries)
+                .ThenInclude(entry => entry.CreatedBy)
             .Include(caseRecord => caseRecord.AssignmentHistory)
                 .ThenInclude(history => history.FromUser)
             .Include(caseRecord => caseRecord.AssignmentHistory)
@@ -570,6 +571,7 @@ public class CasesController(
                 .Include(caseRecord => caseRecord.EvidenceItems)
                 .Include(caseRecord => caseRecord.PlaybookSteps)
                 .Include(caseRecord => caseRecord.TimelineEntries)
+                    .ThenInclude(entry => entry.CreatedBy)
                 .Include(caseRecord => caseRecord.AssignmentHistory)
                     .ThenInclude(history => history.FromUser)
                 .Include(caseRecord => caseRecord.AssignmentHistory)
@@ -612,6 +614,78 @@ public class CasesController(
 
         await db.SaveChangesAsync();
         TempData["StatusMessage"] = $"Evidence added to {irCase.CaseId}.";
+        return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
+    [HttpPost]
+    public async Task<IActionResult> AddTimelineEntry(
+        string id,
+        [Bind(Prefix = "NewTimelineEntry")] TimelineEntryViewModel model)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return NotFound();
+        }
+
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
+            .Include(caseRecord => caseRecord.Assignments)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+
+        if (irCase is null)
+        {
+            return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!caseAccessService.CanModifyEvidence(irCase, User))
+        {
+            return Forbid();
+        }
+
+        model.Trim();
+
+        if (!ModelState.IsValid)
+        {
+            var reloadedCase = await LoadCaseForWorkspaceAsync(id, asNoTracking: true);
+            if (reloadedCase is null)
+            {
+                return await CaseNotFoundOrForbiddenAsync(id);
+            }
+
+            return View("DetailsWorkspace", BuildWorkspaceViewModel(reloadedCase, newTimelineEntry: model));
+        }
+
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Challenge();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var timelineEntry = new TimelineEntry
+        {
+            CaseId = irCase.Id,
+            EventTime = now,
+            Title = model.ActivityType,
+            Description = model.Body,
+            Source = "Manual",
+            CreatedById = userId.Value,
+            CreatedAt = now
+        };
+
+        db.TimelineEntries.Add(timelineEntry);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ApplicationUserId = userId,
+            Action = "TimelineEntryAdded",
+            EntityType = nameof(TimelineEntry),
+            EntityId = irCase.CaseId,
+            Summary = "Case timeline entry added."
+        });
+
+        await db.SaveChangesAsync();
+        TempData["StatusMessage"] = $"Timeline entry added to {irCase.CaseId}.";
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
     }
 
@@ -778,6 +852,7 @@ public class CasesController(
             .Include(caseRecord => caseRecord.EvidenceItems)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .Include(caseRecord => caseRecord.TimelineEntries)
+                .ThenInclude(entry => entry.CreatedBy)
             .Include(caseRecord => caseRecord.AssignmentHistory)
                 .ThenInclude(history => history.FromUser)
             .Include(caseRecord => caseRecord.AssignmentHistory)
@@ -976,7 +1051,8 @@ public class CasesController(
     private CaseWorkspaceViewModel BuildWorkspaceViewModel(
         Case irCase,
         EvidenceMetadataViewModel? newEvidence = null,
-        InvestigationDetailsViewModel? investigationDetails = null)
+        InvestigationDetailsViewModel? investigationDetails = null,
+        TimelineEntryViewModel? newTimelineEntry = null)
     {
         var completedSteps = irCase.PlaybookSteps
             .Where(step => step.IsCompleted)
@@ -1006,6 +1082,7 @@ public class CasesController(
             PlaybookSteps = playbookSteps,
             NewEvidence = newEvidence ?? new EvidenceMetadataViewModel(),
             InvestigationDetails = investigationDetails ?? InvestigationDetailsViewModel.FromCase(irCase),
+            NewTimelineEntry = newTimelineEntry ?? new TimelineEntryViewModel { ActivityType = "Note" },
             CanWorkCase = caseAccessService.CanModifyEvidence(irCase, User) ||
                 caseAccessService.CanModifyPlaybook(irCase, User),
             CanCloseCase = caseAccessService.CanCloseCase(irCase, User),

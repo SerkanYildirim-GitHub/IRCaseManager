@@ -12,6 +12,8 @@ public class CaseWorkspaceViewModel
 
     public InvestigationDetailsViewModel InvestigationDetails { get; init; } = new();
 
+    public TimelineEntryViewModel NewTimelineEntry { get; init; } = new();
+
     public bool CanWorkCase { get; init; }
 
     public bool CanCloseCase { get; init; }

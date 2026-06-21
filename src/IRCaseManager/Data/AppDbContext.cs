@@ -75,6 +75,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(step => step.CaseId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<TimelineEntry>()
+            .HasOne(entry => entry.Case)
+            .WithMany(irCase => irCase.TimelineEntries)
+            .HasForeignKey(entry => entry.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TimelineEntry>()
+            .HasOne(entry => entry.CreatedBy)
+            .WithMany()
+            .HasForeignKey(entry => entry.CreatedById)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<CaseAssignmentHistory>()
             .HasOne(history => history.Case)
             .WithMany(irCase => irCase.AssignmentHistory)

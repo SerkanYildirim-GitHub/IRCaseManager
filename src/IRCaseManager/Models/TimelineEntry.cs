@@ -23,5 +23,7 @@ public class TimelineEntry
 
     public int CreatedById { get; set; }
 
+    public ApplicationUser? CreatedBy { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

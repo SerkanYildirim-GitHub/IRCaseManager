@@ -286,9 +286,57 @@
 
         <article class="workspace-section" id="timeline">
             <div class="panel-header">
-                <h2>Timeline</h2>
+                <h2>Timeline / Investigation Log</h2>
             </div>
-            <p class="empty-state">No timeline entries have been documented yet.</p>
+            @if (caseRecord.TimelineEntries.Count == 0)
+            {
+                <p class="empty-state">No timeline entries have been documented yet.</p>
+            }
+            else
+            {
+                <div class="timeline-entry-list">
+                    @foreach (var entry in caseRecord.TimelineEntries.OrderByDescending(item => item.EventTime))
+                    {
+                        <article class="timeline-entry-item">
+                            <div>
+                                <strong>@entry.Title</strong>
+                                <span>@entry.EventTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                            </div>
+                            <p>@entry.Description</p>
+                            <span class="muted">By @GetUserDisplayName(entry.CreatedBy)</span>
+                        </article>
+                    }
+                </div>
+            }
+
+            @if (Model.CanWorkCase)
+            {
+                <form class="timeline-form" asp-action="AddTimelineEntry" asp-route-id="@caseRecord.CaseId" method="post">
+                    <h3>Add Timeline Entry</h3>
+                    <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="NewTimelineEntry.ActivityType"></label>
+                            <select asp-for="NewTimelineEntry.ActivityType">
+                                <option value="">Select activity type</option>
+                                @foreach (var activityType in IRCaseManager.ViewModels.TimelineEntryViewModel.ActivityTypes)
+                                {
+                                    <option value="@activityType">@activityType</option>
+                                }
+                            </select>
+                            <span asp-validation-for="NewTimelineEntry.ActivityType"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="NewTimelineEntry.Body"></label>
+                            <textarea asp-for="NewTimelineEntry.Body" maxlength="2000" rows="5"></textarea>
+                            <span asp-validation-for="NewTimelineEntry.Body"></span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button" type="submit">Add Entry</button>
+                    </div>
+                </form>
+            }
         </article>
 
         <article class="workspace-section" id="findings">
