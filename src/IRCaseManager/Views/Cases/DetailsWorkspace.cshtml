@@ -11,6 +11,18 @@
     var canReopen = Model.CanReopenCase;
     var canEscalate = Model.CanEscalateCase;
     var canEditInvestigationDetails = Model.CanWorkCase && caseRecord.Status != CaseStatus.Closed;
+    var evidenceSectionOpen = caseRecord.EvidenceItems.Count > 0 ||
+        !string.IsNullOrWhiteSpace(Model.NewEvidence.Name) ||
+        !string.IsNullOrWhiteSpace(Model.NewEvidence.EvidenceType);
+    var timelineSectionOpen = !string.IsNullOrWhiteSpace(Model.NewTimelineEntry.Body);
+    var closureSectionOpen = caseRecord.Status == CaseStatus.Closed;
+    var playbookName = caseRecord.CaseType switch
+    {
+        CaseType.Phishing => caseRecord.CaseType.GetDisplayName(),
+        CaseType.Malware => caseRecord.CaseType.GetDisplayName(),
+        CaseType.UnauthorizedAccess => caseRecord.CaseType.GetDisplayName(),
+        _ => "Generic"
+    };
 }
 
 <section class="case-heading">
@@ -48,10 +60,16 @@
 
 <section class="case-workspace-layout">
     <div class="workspace-main">
-        <article class="workspace-section" id="overview">
-            <div class="panel-header">
+        <div class="workspace-section-controls" data-workspace-controls>
+            <button class="button button-secondary button-compact" type="button" data-workspace-expand-all>Expand All</button>
+            <button class="button button-secondary button-compact" type="button" data-workspace-collapse-all>Collapse All</button>
+        </div>
+
+        <details class="workspace-section workspace-details" id="overview" data-workspace-section open>
+            <summary class="workspace-summary">
                 <h2>Overview</h2>
-            </div>
+            </summary>
+            <div class="workspace-section-body">
             <dl class="overview-list">
                 <dt>Case ID</dt>
                 <dd>@caseRecord.CaseId</dd>
@@ -82,12 +100,14 @@
                 <h3>Initial Summary</h3>
                 <p>@caseRecord.InitialSummary</p>
             </div>
-        </article>
-
-        <article class="workspace-section" id="investigation-details">
-            <div class="panel-header">
-                <h2>Investigation Details</h2>
             </div>
+        </details>
+
+        <details class="workspace-section workspace-details" id="investigation-details" data-workspace-section open>
+            <summary class="workspace-summary">
+                <h2>Investigation Details</h2>
+            </summary>
+            <div class="workspace-section-body">
             @if (canEditInvestigationDetails)
             {
                 <form class="investigation-form" asp-action="UpdateInvestigationDetails" asp-route-id="@caseRecord.CaseId" method="post">
@@ -95,6 +115,7 @@
                     <div class="form-grid">
                         <div class="field">
                             <label asp-for="InvestigationDetails.DetectionSource"></label>
+                            <p class="field-help">Where the alert, report, or lead originated. Examples: EDR, SIEM, Email Gateway, User Report, Helpdesk, Network Alert, Threat Intelligence.</p>
                             <select asp-for="InvestigationDetails.DetectionSource" asp-items="Html.GetEnumSelectList<DetectionSource>()">
                                 <option value="">Select source</option>
                             </select>
@@ -102,47 +123,56 @@
                         </div>
                         <div class="field">
                             <label asp-for="InvestigationDetails.AlertReportedAtUtc"></label>
+                            <p class="field-help">When the suspicious activity was first reported or detected, not necessarily when the case was created.</p>
                             <input asp-for="InvestigationDetails.AlertReportedAtUtc" type="datetime-local" value="@FormatDateTimeLocal(Model.InvestigationDetails.AlertReportedAtUtc)" />
                             <span asp-validation-for="InvestigationDetails.AlertReportedAtUtc"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.AffectedUsers"></label>
-                            <textarea asp-for="InvestigationDetails.AffectedUsers" maxlength="4000" rows="4"></textarea>
+                            <p class="field-help">List known or suspected affected users. Include username, email, department, or role when useful.</p>
+                            <textarea asp-for="InvestigationDetails.AffectedUsers" maxlength="4000" rows="4" placeholder="jsmith@example.com - Finance user who reported suspicious email&#10;unknown - investigation still in progress"></textarea>
                             <span asp-validation-for="InvestigationDetails.AffectedUsers"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.AffectedAssets"></label>
-                            <textarea asp-for="InvestigationDetails.AffectedAssets" maxlength="4000" rows="4"></textarea>
+                            <p class="field-help">List systems, hosts, cloud resources, IPs, or services involved.</p>
+                            <textarea asp-for="InvestigationDetails.AffectedAssets" maxlength="4000" rows="4" placeholder="HOST-123 / 10.10.20.15 - suspected endpoint&#10;mailbox: jsmith@example.com&#10;VPN account: jsmith"></textarea>
                             <span asp-validation-for="InvestigationDetails.AffectedAssets"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.InvolvedAppsOrTools"></label>
-                            <textarea asp-for="InvestigationDetails.InvolvedAppsOrTools" maxlength="4000" rows="4"></textarea>
+                            <p class="field-help">List business apps, security tools, or platforms involved in detection or response.</p>
+                            <textarea asp-for="InvestigationDetails.InvolvedAppsOrTools" maxlength="4000" rows="4" placeholder="Microsoft 365, Defender for Endpoint, Sentinel, VPN, Okta"></textarea>
                             <span asp-validation-for="InvestigationDetails.InvolvedAppsOrTools"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.InitialFindings"></label>
-                            <textarea asp-for="InvestigationDetails.InitialFindings" maxlength="4000" rows="5"></textarea>
+                            <p class="field-help">Summarize what is known so far. Include alert source, affected user/system, suspicious activity, and current assessment.</p>
+                            <textarea asp-for="InvestigationDetails.InitialFindings" maxlength="4000" rows="5" placeholder="EDR alert reported suspicious PowerShell activity on HOST-123 for user jsmith. Initial review shows encoded command execution and outbound connection to an unknown IP. No confirmed data exfiltration at this time."></textarea>
                             <span asp-validation-for="InvestigationDetails.InitialFindings"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.ContainmentActions"></label>
-                            <textarea asp-for="InvestigationDetails.ContainmentActions" maxlength="4000" rows="4"></textarea>
+                            <p class="field-help">Document actions taken to stop or limit impact.</p>
+                            <textarea asp-for="InvestigationDetails.ContainmentActions" maxlength="4000" rows="4" placeholder="Isolated HOST-123 in EDR.&#10;Disabled user jsmith account pending password reset.&#10;Blocked suspicious domain at email gateway.&#10;No additional affected hosts identified so far."></textarea>
                             <span asp-validation-for="InvestigationDetails.ContainmentActions"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.IocSummary"></label>
-                            <textarea asp-for="InvestigationDetails.IocSummary" maxlength="4000" rows="4"></textarea>
+                            <p class="field-help">Record indicators found during analysis. Include IPs, domains, hashes, file paths, sender addresses, URLs, or detection names.</p>
+                            <textarea asp-for="InvestigationDetails.IocSummary" maxlength="4000" rows="4" placeholder="IP: 203.0.113.10&#10;Domain: suspicious-example.com&#10;File: invoice_update.exe&#10;Hash: hash if available&#10;Detection: Suspicious PowerShell"></textarea>
                             <span asp-validation-for="InvestigationDetails.IocSummary"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.EscalationReason"></label>
-                            <textarea asp-for="InvestigationDetails.EscalationReason" maxlength="4000" rows="4"></textarea>
+                            <p class="field-help">Explain why this case requires higher-level review or another team.</p>
+                            <textarea asp-for="InvestigationDetails.EscalationReason" maxlength="4000" rows="4" placeholder="Escalating because lateral movement is suspected and additional EDR/SIEM review is needed. L1 does not have sufficient access to validate domain controller authentication events."></textarea>
                             <span asp-validation-for="InvestigationDetails.EscalationReason"></span>
                         </div>
                         <div class="field field-wide">
                             <label asp-for="InvestigationDetails.ClosureSummary"></label>
-                            <textarea asp-for="InvestigationDetails.ClosureSummary" maxlength="4000" rows="4"></textarea>
+                            <p class="field-help">Summarize outcome, containment/recovery, residual risk, and any follow-up.</p>
+                            <textarea asp-for="InvestigationDetails.ClosureSummary" maxlength="4000" rows="4" placeholder="Incident contained. Affected endpoint isolated and reimaged. User password reset and MFA session revoked. No evidence of data exfiltration found. Follow-up: review PowerShell policy and add detection rule."></textarea>
                             <span asp-validation-for="InvestigationDetails.ClosureSummary"></span>
                         </div>
                     </div>
@@ -176,12 +206,14 @@
                     <dd>@FormatOptional(caseRecord.ClosureSummary)</dd>
                 </dl>
             }
-        </article>
-
-        <article class="workspace-section" id="assignment-history">
-            <div class="panel-header">
-                <h2>Assignment History</h2>
             </div>
+        </details>
+
+        <details class="workspace-section workspace-details" id="assignment-history" data-workspace-section>
+            <summary class="workspace-summary">
+                <h2>Assignment History</h2>
+            </summary>
+            <div class="workspace-section-body">
             @if (caseRecord.AssignmentHistory.Count == 0)
             {
                 <p class="empty-state">No assignment or escalation history has been recorded yet.</p>
@@ -210,12 +242,14 @@
                     }
                 </div>
             }
-        </article>
-
-        <article class="workspace-section" id="evidence">
-            <div class="panel-header">
-                <h2>Evidence</h2>
             </div>
+        </details>
+
+        <details class="workspace-section workspace-details" id="evidence" data-workspace-section open="@evidenceSectionOpen">
+            <summary class="workspace-summary">
+                <h2>Evidence Metadata</h2>
+            </summary>
+            <div class="workspace-section-body">
             <p class="muted">File attachment will be added in a later secure upload slice.</p>
             @if (caseRecord.EvidenceItems.Count == 0)
             {
@@ -282,12 +316,14 @@
                     </div>
                 </form>
             }
-        </article>
-
-        <article class="workspace-section" id="timeline">
-            <div class="panel-header">
-                <h2>Timeline / Investigation Log</h2>
             </div>
+        </details>
+
+        <details class="workspace-section workspace-details" id="timeline" data-workspace-section open="@timelineSectionOpen">
+            <summary class="workspace-summary">
+                <h2>Timeline / Investigation Log</h2>
+            </summary>
+            <div class="workspace-section-body">
             @if (caseRecord.TimelineEntries.Count == 0)
             {
                 <p class="empty-state">No timeline entries have been documented yet.</p>
@@ -317,6 +353,7 @@
                     <div class="form-grid">
                         <div class="field">
                             <label asp-for="NewTimelineEntry.ActivityType"></label>
+                            <p class="field-help">Choose the type that best describes the entry.</p>
                             <select asp-for="NewTimelineEntry.ActivityType">
                                 <option value="">Select activity type</option>
                                 @foreach (var activityType in IRCaseManager.ViewModels.TimelineEntryViewModel.ActivityTypes)
@@ -328,7 +365,8 @@
                         </div>
                         <div class="field field-wide">
                             <label asp-for="NewTimelineEntry.Body"></label>
-                            <textarea asp-for="NewTimelineEntry.Body" maxlength="2000" rows="5"></textarea>
+                            <p class="field-help">Write what was done, observed, decided, or communicated. Avoid passwords, secrets, or unnecessary sensitive data.</p>
+                            <textarea asp-for="NewTimelineEntry.Body" maxlength="2000" rows="5" placeholder="Reviewed EDR alert for HOST-123. Confirmed suspicious PowerShell execution. Collected process tree and network connection details. Next step: review authentication logs for the affected user."></textarea>
                             <span asp-validation-for="NewTimelineEntry.Body"></span>
                         </div>
                     </div>
@@ -337,75 +375,116 @@
                     </div>
                 </form>
             }
-        </article>
+            </div>
+        </details>
 
-        <article class="workspace-section" id="findings">
-            <div class="panel-header">
+        <details class="workspace-section workspace-details" id="findings" data-workspace-section>
+            <summary class="workspace-summary">
                 <h2>Findings / IOCs</h2>
-            </div>
+            </summary>
+            <div class="workspace-section-body">
             <p class="empty-state">No findings, observables, or indicators have been documented yet.</p>
-        </article>
+            </div>
+        </details>
 
-        <article class="workspace-section" id="mitre">
-            <div class="panel-header">
+        <details class="workspace-section workspace-details" id="mitre" data-workspace-section>
+            <summary class="workspace-summary">
                 <h2>MITRE ATT&amp;CK Mapping</h2>
-            </div>
+            </summary>
+            <div class="workspace-section-body">
             <p class="empty-state">Observed tactics, techniques, and procedures will be documented here as the investigation develops.</p>
-        </article>
+            </div>
+        </details>
 
-        <article class="workspace-section" id="notes">
-            <div class="panel-header">
+        <details class="workspace-section workspace-details" id="notes" data-workspace-section>
+            <summary class="workspace-summary">
                 <h2>Notes / Actions</h2>
-            </div>
+            </summary>
+            <div class="workspace-section-body">
             <p class="empty-state">No analyst notes or response actions have been documented yet.</p>
-        </article>
-
-        <article class="workspace-section" id="closure">
-            <div class="panel-header">
-                <h2>Closure Report</h2>
             </div>
+        </details>
+
+        <details class="workspace-section workspace-details" id="closure" data-workspace-section open="@closureSectionOpen">
+            <summary class="workspace-summary">
+                <h2>Closure Report</h2>
+            </summary>
+            <div class="workspace-section-body">
             <p class="empty-state">The closure report will be generated from documented case data once the case is ready to close.</p>
-        </article>
+            </div>
+        </details>
     </div>
 
     <aside class="playbook-sidebar" id="playbook">
         <div class="panel-header">
             <div>
                 <p class="eyebrow">@caseRecord.CaseType.GetDisplayName()</p>
-                <h2>IR Playbook / Runbook</h2>
+                <h2>IR Playbook: @playbookName</h2>
             </div>
         </div>
         <div class="playbook-steps">
             @foreach (var step in Model.PlaybookSteps)
             {
                 var canToggleStep = Model.CanWorkCase && !step.IsAutoCompleted;
-                <article class="playbook-step @(step.IsComplete ? "is-complete" : "is-open") @(step.IsAutoCompleted ? "is-auto-complete" : string.Empty)">
-                    <form asp-action="TogglePlaybookStep" asp-route-id="@caseRecord.CaseId" method="post">
-                        <input type="hidden" name="stepKey" value="@step.Key" />
-                        <input type="hidden" name="completionState" value="@(step.IsManuallyCompleted ? "open" : "complete")" />
-                        <label>
-                            <input type="checkbox" checked="@step.IsComplete" disabled="@(!canToggleStep)" onchange="this.form.submit()" />
-                            <span>@step.Title</span>
-                            @if (step.IsAutoCompleted)
-                            {
-                                <span class="playbook-auto-badge" title="@step.AutoCompletionReason">Auto</span>
-                            }
-                        </label>
+                <details class="playbook-step @(step.IsComplete ? "is-complete playbook-step--complete" : "is-open playbook-step--incomplete") @(step.IsAutoCompleted ? "is-auto-complete" : string.Empty)" open="@(!step.IsComplete)">
+                    <summary class="playbook-step-summary">
+                        <span class="playbook-status-indicator" aria-hidden="true"></span>
+                        <span class="playbook-step-title">@step.Title</span>
+                        @if (step.IsAutoCompleted)
+                        {
+                            <span class="playbook-auto-badge" title="@step.AutoCompletionReason">Auto</span>
+                        }
+                    </summary>
+                    <div class="playbook-step-body">
                         <p>@step.Description</p>
                         @if (step.IsAutoCompleted)
                         {
                             <p class="playbook-auto-note">@step.AutoCompletionReason</p>
                         }
+                        @if (canToggleStep)
+                        {
+                            <form class="playbook-step-form" asp-action="TogglePlaybookStep" asp-route-id="@caseRecord.CaseId" method="post">
+                                <input type="hidden" name="stepKey" value="@step.Key" />
+                                <input type="hidden" name="completionState" value="@(step.IsManuallyCompleted ? "open" : "complete")" />
+                                <label class="playbook-step-toggle">
+                                    <input type="checkbox" checked="@step.IsManuallyCompleted" onchange="this.form.submit()" />
+                                    <span>@(step.IsManuallyCompleted ? "Marked complete" : "Mark step complete")</span>
+                                </label>
+                            </form>
+                        }
                         else if (!Model.CanWorkCase)
                         {
                             <span class="muted">Read-only</span>
                         }
-                    </form>
-                </article>
+                    </div>
+                </details>
             }
         </div>
     </aside>
 </section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const controls = document.querySelector("[data-workspace-controls]");
+            if (!controls) {
+                return;
+            }
+
+            const sections = Array.from(document.querySelectorAll("[data-workspace-section]"));
+            controls.querySelector("[data-workspace-expand-all]")?.addEventListener("click", () => {
+                sections.forEach(section => {
+                    section.open = true;
+                });
+            });
+            controls.querySelector("[data-workspace-collapse-all]")?.addEventListener("click", () => {
+                sections.forEach(section => {
+                    section.open = false;
+                });
+            });
+        })();
+    </script>
+}
 
 @functions {
     private static string GetUserDisplayName(ApplicationUser? user)
