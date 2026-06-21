@@ -316,7 +316,8 @@ public class CasesController(
             closedAt: DateTimeOffset.UtcNow,
             action: "CaseClosed",
             summary: "Case closed.",
-            canUpdate: irCase => caseAccessService.CanCloseCase(irCase, User));
+            canUpdate: irCase => caseAccessService.CanCloseCase(irCase, User),
+            validate: GetMissingCloseRequirements);
 
         return updateResult;
     }
@@ -388,6 +389,13 @@ public class CasesController(
         if (!caseAccessService.CanEscalateCase(irCase, User))
         {
             return Forbid();
+        }
+
+        var missingFields = GetMissingEscalationRequirements(irCase);
+        if (missingFields.Count > 0)
+        {
+            TempData["StatusMessage"] = BuildMissingFieldsMessage("Case was not escalated", missingFields);
+            return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
         }
 
         var userId = User.GetUserId();
@@ -464,6 +472,7 @@ public class CasesController(
         var irCase = await caseAccessService
             .FilterVisibleCases(db.Cases, User)
             .Include(caseRecord => caseRecord.Assignments)
+            .Include(caseRecord => caseRecord.EvidenceItems)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
 
@@ -484,6 +493,12 @@ public class CasesController(
         if (definition is null)
         {
             return NotFound();
+        }
+
+        if (GetAutoCompletionReason(irCase, definition) is not null)
+        {
+            TempData["StatusMessage"] = "This playbook step is auto-completed from case data.";
+            return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
         }
 
         var userId = User.GetUserId();
@@ -600,6 +615,79 @@ public class CasesController(
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
+    [HttpPost]
+    public async Task<IActionResult> UpdateInvestigationDetails(
+        string id,
+        [Bind(Prefix = "InvestigationDetails")] InvestigationDetailsViewModel model)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return NotFound();
+        }
+
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
+            .Include(caseRecord => caseRecord.Assignments)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+
+        if (irCase is null)
+        {
+            return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!caseAccessService.CanModifyPlaybook(irCase, User))
+        {
+            return Forbid();
+        }
+
+        model.Trim();
+
+        if (!ModelState.IsValid)
+        {
+            var reloadedCase = await LoadCaseForWorkspaceAsync(id, asNoTracking: true);
+            if (reloadedCase is null)
+            {
+                return await CaseNotFoundOrForbiddenAsync(id);
+            }
+
+            return View("DetailsWorkspace", BuildWorkspaceViewModel(reloadedCase, investigationDetails: model));
+        }
+
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Challenge();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        irCase.DetectionSource = model.DetectionSource;
+        irCase.AlertReportedAtUtc = model.AlertReportedAtUtc?.ToUniversalTime();
+        irCase.AffectedUsers = model.AffectedUsers;
+        irCase.AffectedAssets = model.AffectedAssets;
+        irCase.InvolvedAppsOrTools = model.InvolvedAppsOrTools;
+        irCase.InitialFindings = model.InitialFindings;
+        irCase.ContainmentActions = model.ContainmentActions;
+        irCase.IocSummary = model.IocSummary;
+        irCase.EscalationReason = model.EscalationReason;
+        irCase.ClosureSummary = model.ClosureSummary;
+        irCase.UpdatedAt = now;
+        irCase.UpdatedById = userId.Value;
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ApplicationUserId = userId,
+            Action = "InvestigationDetailsUpdated",
+            EntityType = nameof(Case),
+            EntityId = irCase.CaseId,
+            Summary = "Investigation details updated."
+        });
+
+        await db.SaveChangesAsync();
+        TempData["StatusMessage"] = $"Investigation details updated for {irCase.CaseId}.";
+        return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
     private async Task PopulateAssignedUserOptionsAsync()
     {
         var users = await db.Users
@@ -678,6 +766,27 @@ public class CasesController(
         return int.TryParse(sequence, out var number) ? $"TK-{number:00000}" : "TK-00000";
     }
 
+    private async Task<Case?> LoadCaseForWorkspaceAsync(string id, bool asNoTracking)
+    {
+        var cases = asNoTracking ? db.Cases.AsNoTracking() : db.Cases;
+
+        return await caseAccessService
+            .FilterVisibleCases(cases, User)
+            .Include(caseRecord => caseRecord.CreatedBy)
+            .Include(caseRecord => caseRecord.Assignments)
+                .ThenInclude(assignment => assignment.ApplicationUser)
+            .Include(caseRecord => caseRecord.EvidenceItems)
+            .Include(caseRecord => caseRecord.PlaybookSteps)
+            .Include(caseRecord => caseRecord.TimelineEntries)
+            .Include(caseRecord => caseRecord.AssignmentHistory)
+                .ThenInclude(history => history.FromUser)
+            .Include(caseRecord => caseRecord.AssignmentHistory)
+                .ThenInclude(history => history.ToUser)
+            .Include(caseRecord => caseRecord.AssignmentHistory)
+                .ThenInclude(history => history.PerformedByUser)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+    }
+
     private string? GetEscalationTargetRoleName()
     {
         if (User.IsInRole(RoleNames.AnalystLevel1))
@@ -752,13 +861,54 @@ public class CasesController(
         db.CaseAssignmentHistories.Add(history);
     }
 
+    private static IReadOnlyList<string> GetMissingEscalationRequirements(Case irCase)
+    {
+        var missing = new List<string>();
+        AddIfMissing(missing, irCase.DetectionSource is not null, "Detection source");
+        AddIfMissing(missing, irCase.AlertReportedAtUtc is not null, "Alert/report time");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.AffectedUsers), "Affected user(s)");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.AffectedAssets), "Affected asset(s)");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.InvolvedAppsOrTools), "Involved app(s) or tool(s)");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.InitialFindings), "Initial findings");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.EscalationReason), "Escalation reason");
+        return missing;
+    }
+
+    private static IReadOnlyList<string> GetMissingCloseRequirements(Case irCase)
+    {
+        var missing = new List<string>();
+        AddIfMissing(missing, irCase.DetectionSource is not null, "Detection source");
+        AddIfMissing(missing, irCase.AlertReportedAtUtc is not null, "Alert/report time");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.AffectedUsers), "Affected user(s)");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.AffectedAssets), "Affected asset(s)");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.InvolvedAppsOrTools), "Involved app(s) or tool(s)");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.InitialFindings), "Initial findings");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.ContainmentActions), "Containment actions");
+        AddIfMissing(missing, !string.IsNullOrWhiteSpace(irCase.ClosureSummary), "Closure summary");
+        return missing;
+    }
+
+    private static void AddIfMissing(ICollection<string> missing, bool hasValue, string label)
+    {
+        if (!hasValue)
+        {
+            missing.Add(label);
+        }
+    }
+
+    private static string BuildMissingFieldsMessage(string prefix, IReadOnlyList<string> missingFields)
+    {
+        return $"{prefix}. Complete required investigation fields first: {string.Join(", ", missingFields)}.";
+    }
+
     private async Task<IActionResult> UpdateCaseLifecycleAsync(
         string id,
         CaseStatus status,
         DateTimeOffset? closedAt,
         string action,
         string summary,
-        Func<Case, bool> canUpdate)
+        Func<Case, bool> canUpdate,
+        Func<Case, IReadOnlyList<string>>? validate = null)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -777,6 +927,13 @@ public class CasesController(
         if (!canUpdate(irCase))
         {
             return Forbid();
+        }
+
+        var missingFields = validate?.Invoke(irCase) ?? [];
+        if (missingFields.Count > 0)
+        {
+            TempData["StatusMessage"] = BuildMissingFieldsMessage("Case was not closed", missingFields);
+            return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
         }
 
         var userId = User.GetUserId();
@@ -818,7 +975,8 @@ public class CasesController(
 
     private CaseWorkspaceViewModel BuildWorkspaceViewModel(
         Case irCase,
-        EvidenceMetadataViewModel? newEvidence = null)
+        EvidenceMetadataViewModel? newEvidence = null,
+        InvestigationDetailsViewModel? investigationDetails = null)
     {
         var completedSteps = irCase.PlaybookSteps
             .Where(step => step.IsCompleted)
@@ -847,6 +1005,7 @@ public class CasesController(
             Case = irCase,
             PlaybookSteps = playbookSteps,
             NewEvidence = newEvidence ?? new EvidenceMetadataViewModel(),
+            InvestigationDetails = investigationDetails ?? InvestigationDetailsViewModel.FromCase(irCase),
             CanWorkCase = caseAccessService.CanModifyEvidence(irCase, User) ||
                 caseAccessService.CanModifyPlaybook(irCase, User),
             CanCloseCase = caseAccessService.CanCloseCase(irCase, User),
@@ -860,16 +1019,40 @@ public class CasesController(
         var reasons = new List<string>();
         var signals = step.AutoCompletionSignals;
 
-        if (signals.HasFlag(PlaybookAutoCompletionSignals.SourceReference) &&
-            !string.IsNullOrWhiteSpace(irCase.SourceReference))
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.DetectionSource) &&
+            irCase.DetectionSource is not null)
         {
-            reasons.Add("source reference is documented");
+            reasons.Add("detection source is documented");
         }
 
-        if (signals.HasFlag(PlaybookAutoCompletionSignals.InitialSummary) &&
-            !string.IsNullOrWhiteSpace(irCase.InitialSummary))
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.AlertReportedAt) &&
+            irCase.AlertReportedAtUtc is not null)
         {
-            reasons.Add("initial summary is documented");
+            reasons.Add("alert/report time is documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.AffectedUsers) &&
+            !string.IsNullOrWhiteSpace(irCase.AffectedUsers))
+        {
+            reasons.Add("affected user details are documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.AffectedAssets) &&
+            !string.IsNullOrWhiteSpace(irCase.AffectedAssets))
+        {
+            reasons.Add("affected asset details are documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.InvolvedAppsOrTools) &&
+            !string.IsNullOrWhiteSpace(irCase.InvolvedAppsOrTools))
+        {
+            reasons.Add("involved apps or tools are documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.InitialFindings) &&
+            !string.IsNullOrWhiteSpace(irCase.InitialFindings))
+        {
+            reasons.Add("initial findings are documented");
         }
 
         if (signals.HasFlag(PlaybookAutoCompletionSignals.Evidence) &&
@@ -878,16 +1061,28 @@ public class CasesController(
             reasons.Add("evidence metadata exists");
         }
 
-        if (signals.HasFlag(PlaybookAutoCompletionSignals.Escalated) &&
-            irCase.Status == CaseStatus.Escalated)
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.IocSummary) &&
+            !string.IsNullOrWhiteSpace(irCase.IocSummary))
         {
-            reasons.Add("case is escalated");
+            reasons.Add("IOC summary is documented");
         }
 
-        if (signals.HasFlag(PlaybookAutoCompletionSignals.Closed) &&
-            irCase.Status == CaseStatus.Closed)
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.ContainmentActions) &&
+            !string.IsNullOrWhiteSpace(irCase.ContainmentActions))
         {
-            reasons.Add("case is closed");
+            reasons.Add("containment actions are documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.EscalationReason) &&
+            !string.IsNullOrWhiteSpace(irCase.EscalationReason))
+        {
+            reasons.Add("escalation reason is documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.ClosureSummary) &&
+            !string.IsNullOrWhiteSpace(irCase.ClosureSummary))
+        {
+            reasons.Add("closure summary is documented");
         }
 
         return reasons.Count == 0

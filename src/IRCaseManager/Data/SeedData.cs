@@ -16,6 +16,7 @@ public static class SeedData
         await db.Database.EnsureCreatedAsync();
         await EnsureDevelopmentLoginHardeningSchemaAsync(db);
         await EnsureDevelopmentCaseAssignmentHistorySchemaAsync(db);
+        await EnsureDevelopmentCaseInvestigationSchemaAsync(db);
         await SeedRolesAsync(db);
         await SeedDevelopmentTestUsersAsync(db, logger);
     }
@@ -121,6 +122,64 @@ public static class SeedData
         await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_CaseAssignmentHistories_FromUserId ON CaseAssignmentHistories (FromUserId)");
         await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_CaseAssignmentHistories_ToUserId ON CaseAssignmentHistories (ToUserId)");
         await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_CaseAssignmentHistories_PerformedByUserId ON CaseAssignmentHistories (PerformedByUserId)");
+    }
+
+    private static async Task EnsureDevelopmentCaseInvestigationSchemaAsync(AppDbContext db)
+    {
+        if (!db.Database.IsSqlite())
+        {
+            return;
+        }
+
+        var existingColumns = await GetCaseColumnNamesAsync(db);
+        var columnsToAdd = new Dictionary<string, string>
+        {
+            [nameof(Case.DetectionSource)] = "INTEGER NULL",
+            [nameof(Case.AlertReportedAtUtc)] = "TEXT NULL",
+            [nameof(Case.AffectedUsers)] = "TEXT NULL",
+            [nameof(Case.AffectedAssets)] = "TEXT NULL",
+            [nameof(Case.InvolvedAppsOrTools)] = "TEXT NULL",
+            [nameof(Case.InitialFindings)] = "TEXT NULL",
+            [nameof(Case.ContainmentActions)] = "TEXT NULL",
+            [nameof(Case.IocSummary)] = "TEXT NULL",
+            [nameof(Case.EscalationReason)] = "TEXT NULL",
+            [nameof(Case.ClosureSummary)] = "TEXT NULL"
+        };
+
+        foreach (var column in columnsToAdd)
+        {
+            if (!existingColumns.Contains(column.Key))
+            {
+                await ExecuteSchemaCommandAsync(db, $"ALTER TABLE Cases ADD COLUMN {column.Key} {column.Value}");
+            }
+        }
+    }
+
+    private static async Task<HashSet<string>> GetCaseColumnNamesAsync(AppDbContext db)
+    {
+        var columns = new HashSet<string>(StringComparer.Ordinal);
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info('Cases')";
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        if (shouldClose)
+        {
+            await connection.CloseAsync();
+        }
+
+        return columns;
     }
 
     private static async Task SeedRolesAsync(AppDbContext db)

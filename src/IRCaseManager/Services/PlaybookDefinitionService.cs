@@ -6,11 +6,17 @@ namespace IRCaseManager.Services;
 public enum PlaybookAutoCompletionSignals
 {
     None = 0,
-    SourceReference = 1,
-    InitialSummary = 2,
-    Evidence = 4,
-    Escalated = 8,
-    Closed = 16
+    DetectionSource = 1,
+    AlertReportedAt = 2,
+    AffectedUsers = 4,
+    AffectedAssets = 8,
+    InvolvedAppsOrTools = 16,
+    InitialFindings = 32,
+    Evidence = 64,
+    IocSummary = 128,
+    ContainmentActions = 256,
+    EscalationReason = 512,
+    ClosureSummary = 1024
 }
 
 public record PlaybookStepDefinition(
@@ -32,39 +38,46 @@ public class PlaybookDefinitionService
         };
     }
 
+    private static readonly PlaybookStepDefinition[] CommonFoundationalSteps =
+    [
+        new("record-detection-source", "Record detection source", "Document where the case was detected or reported, such as EDR, SIEM, user report, or threat intelligence.", PlaybookAutoCompletionSignals.DetectionSource),
+        new("record-alert-report-time", "Record alert/report time", "Document when the alert, report, or suspected activity was first observed or reported.", PlaybookAutoCompletionSignals.AlertReportedAt),
+        new("identify-affected-users", "Identify affected user(s)", "Document accounts, users, mailboxes, or identities currently believed to be affected.", PlaybookAutoCompletionSignals.AffectedUsers),
+        new("identify-affected-assets", "Identify affected asset(s)", "Document hosts, systems, services, repositories, data sets, or other assets in scope.", PlaybookAutoCompletionSignals.AffectedAssets),
+        new("identify-involved-apps-tools", "Identify involved app(s) or tool(s)", "Document involved security tools, applications, platforms, or business systems.", PlaybookAutoCompletionSignals.InvolvedAppsOrTools),
+        new("document-initial-findings", "Document initial findings", "Summarize the initial technical findings, confidence, impact, and scope assumptions.", PlaybookAutoCompletionSignals.InitialFindings),
+        new("preserve-supporting-evidence", "Preserve supporting evidence", "Record evidence metadata for alerts, logs, messages, hashes, screenshots, or other supporting artifacts.", PlaybookAutoCompletionSignals.Evidence),
+        new("document-ioc-summary", "Document IOC summary", "Summarize observed indicators such as IPs, domains, URLs, hashes, accounts, files, or process names.", PlaybookAutoCompletionSignals.IocSummary),
+        new("document-containment-actions", "Document containment actions", "Document containment decisions such as isolation, blocking, session revocation, mailbox action, or access restriction.", PlaybookAutoCompletionSignals.ContainmentActions),
+        new("provide-escalation-reason", "Provide escalation reason", "Document why higher-level review, ownership transfer, or management attention is required.", PlaybookAutoCompletionSignals.EscalationReason),
+        new("prepare-closure-summary", "Prepare closure summary", "Summarize impact, actions taken, residual risk, and final closure rationale.", PlaybookAutoCompletionSignals.ClosureSummary)
+    ];
+
     private static readonly PlaybookStepDefinition[] Phishing =
     [
-        new("phishing-triage", "Validate report", "Confirm the message, sender, recipients, and source reference before taking response action.", PlaybookAutoCompletionSignals.SourceReference | PlaybookAutoCompletionSignals.InitialSummary),
-        new("phishing-headers", "Review headers and links", "Document relevant header details, URLs, attachment names, and visible impersonation indicators.", PlaybookAutoCompletionSignals.Evidence),
-        new("phishing-scope", "Identify impacted users", "Determine who received or interacted with the message and whether credentials or endpoints may be affected."),
-        new("phishing-containment", "Coordinate containment", "Track mailbox, URL, attachment, and credential containment decisions in the case notes."),
-        new("phishing-lessons", "Prepare closure notes", "Summarize findings, impact, actions taken, and prevention opportunities.", PlaybookAutoCompletionSignals.Closed)
+        ..CommonFoundationalSteps,
+        new("phishing-message-analysis", "Analyze message artifacts", "Review sender, recipients, headers, URLs, attachment names, and impersonation indicators."),
+        new("phishing-scope-mailboxes", "Scope mailbox exposure", "Determine who received, opened, clicked, replied, or submitted credentials.")
     ];
 
     private static readonly PlaybookStepDefinition[] Malware =
     [
-        new("malware-triage", "Confirm detection", "Document alert source, host, user, file path, hash, and first observed time.", PlaybookAutoCompletionSignals.SourceReference | PlaybookAutoCompletionSignals.InitialSummary),
-        new("malware-scope", "Scope affected assets", "Identify related hosts, users, processes, persistence points, and lateral movement indicators."),
-        new("malware-evidence", "Record evidence metadata", "Capture metadata for logs, hashes, memory, disk, or EDR artifacts without uploading files in this slice.", PlaybookAutoCompletionSignals.Evidence),
-        new("malware-containment", "Track containment", "Document isolation, blocking, eradication, and recovery decisions."),
-        new("malware-review", "Review residual risk", "Confirm whether additional monitoring, reimaging, or credential actions are required.", PlaybookAutoCompletionSignals.Closed)
+        ..CommonFoundationalSteps,
+        new("malware-technical-analysis", "Perform malware technical analysis", "Review process, file, hash, persistence, command line, and related endpoint telemetry."),
+        new("malware-eradication-recovery", "Plan eradication and recovery", "Document cleanup, reimage, credential, and monitoring follow-up decisions.")
     ];
 
     private static readonly PlaybookStepDefinition[] UnauthorizedAccess =
     [
-        new("access-validate", "Validate access concern", "Confirm account, asset, source IP, authentication pattern, and triggering detection.", PlaybookAutoCompletionSignals.SourceReference | PlaybookAutoCompletionSignals.InitialSummary),
-        new("access-scope", "Scope identity and asset activity", "Review affected users, sessions, privilege changes, and related systems."),
-        new("access-containment", "Track containment actions", "Document session revocation, password reset, MFA actions, and access restrictions."),
-        new("access-timeline", "Build activity timeline", "Record key authentication and post-authentication events in chronological order."),
-        new("access-closure", "Document closure rationale", "Summarize confirmed impact, response actions, and follow-up monitoring.", PlaybookAutoCompletionSignals.Closed)
+        ..CommonFoundationalSteps,
+        new("access-authentication-review", "Review authentication activity", "Analyze source IPs, session patterns, MFA events, privilege changes, and suspicious account behavior."),
+        new("access-identity-recovery", "Plan identity recovery", "Document password reset, session revocation, token invalidation, access review, and monitoring follow-up.")
     ];
 
     private static readonly PlaybookStepDefinition[] Generic =
     [
-        new("generic-triage", "Triage case", "Confirm the alert, source reference, severity, initial scope, and assigned response owner.", PlaybookAutoCompletionSignals.SourceReference | PlaybookAutoCompletionSignals.InitialSummary),
-        new("generic-evidence", "Document evidence metadata", "Record relevant sources, timestamps, references, and analyst notes.", PlaybookAutoCompletionSignals.Evidence),
-        new("generic-timeline", "Build timeline", "Capture important investigation and response events in order."),
-        new("generic-findings", "Document findings", "Record observables, IOCs, affected assets, and analyst conclusions."),
-        new("generic-closure", "Prepare closure report", "Summarize impact, actions taken, open risk, and handoff items.", PlaybookAutoCompletionSignals.Closed)
+        ..CommonFoundationalSteps,
+        new("generic-technical-analysis", "Perform technical analysis", "Review available logs, alerts, observables, user reports, and timeline clues."),
+        new("generic-recovery-followup", "Plan recovery follow-up", "Document recovery, monitoring, lessons learned, or handoff items for later closure.")
     ];
 }

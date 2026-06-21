@@ -31,6 +31,34 @@ public class Case
     [Required, StringLength(4000)]
     public string InitialSummary { get; set; } = string.Empty;
 
+    public DetectionSource? DetectionSource { get; set; }
+
+    public DateTimeOffset? AlertReportedAtUtc { get; set; }
+
+    [StringLength(4000)]
+    public string? AffectedUsers { get; set; }
+
+    [StringLength(4000)]
+    public string? AffectedAssets { get; set; }
+
+    [StringLength(4000)]
+    public string? InvolvedAppsOrTools { get; set; }
+
+    [StringLength(4000)]
+    public string? InitialFindings { get; set; }
+
+    [StringLength(4000)]
+    public string? ContainmentActions { get; set; }
+
+    [StringLength(4000)]
+    public string? IocSummary { get; set; }
+
+    [StringLength(4000)]
+    public string? EscalationReason { get; set; }
+
+    [StringLength(4000)]
+    public string? ClosureSummary { get; set; }
+
     [StringLength(256)]
     public string Visibility { get; set; } = "Default";
 

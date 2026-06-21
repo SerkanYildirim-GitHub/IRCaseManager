@@ -20,6 +20,29 @@ public enum CaseStatus
     Closed = 5
 }
 
+public enum DetectionSource
+{
+    EDR = 1,
+
+    SIEM = 2,
+
+    [Display(Name = "Email Gateway")]
+    EmailGateway = 3,
+
+    [Display(Name = "User Report")]
+    UserReport = 4,
+
+    Helpdesk = 5,
+
+    [Display(Name = "Network Alert")]
+    NetworkAlert = 6,
+
+    [Display(Name = "Threat Intelligence")]
+    ThreatIntelligence = 7,
+
+    Other = 8
+}
+
 public enum CaseType
 {
     [Display(Name = "Alert Triage")]

@@ -10,6 +10,8 @@ public class CaseWorkspaceViewModel
 
     public EvidenceMetadataViewModel NewEvidence { get; init; } = new();
 
+    public InvestigationDetailsViewModel InvestigationDetails { get; init; } = new();
+
     public bool CanWorkCase { get; init; }
 
     public bool CanCloseCase { get; init; }

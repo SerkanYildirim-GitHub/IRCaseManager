@@ -10,6 +10,7 @@
     var canClose = Model.CanCloseCase;
     var canReopen = Model.CanReopenCase;
     var canEscalate = Model.CanEscalateCase;
+    var canEditInvestigationDetails = Model.CanWorkCase && caseRecord.Status != CaseStatus.Closed;
 }
 
 <section class="case-heading">
@@ -81,6 +82,100 @@
                 <h3>Initial Summary</h3>
                 <p>@caseRecord.InitialSummary</p>
             </div>
+        </article>
+
+        <article class="workspace-section" id="investigation-details">
+            <div class="panel-header">
+                <h2>Investigation Details</h2>
+            </div>
+            @if (canEditInvestigationDetails)
+            {
+                <form class="investigation-form" asp-action="UpdateInvestigationDetails" asp-route-id="@caseRecord.CaseId" method="post">
+                    <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="InvestigationDetails.DetectionSource"></label>
+                            <select asp-for="InvestigationDetails.DetectionSource" asp-items="Html.GetEnumSelectList<DetectionSource>()">
+                                <option value="">Select source</option>
+                            </select>
+                            <span asp-validation-for="InvestigationDetails.DetectionSource"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="InvestigationDetails.AlertReportedAtUtc"></label>
+                            <input asp-for="InvestigationDetails.AlertReportedAtUtc" type="datetime-local" value="@FormatDateTimeLocal(Model.InvestigationDetails.AlertReportedAtUtc)" />
+                            <span asp-validation-for="InvestigationDetails.AlertReportedAtUtc"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.AffectedUsers"></label>
+                            <textarea asp-for="InvestigationDetails.AffectedUsers" maxlength="4000" rows="4"></textarea>
+                            <span asp-validation-for="InvestigationDetails.AffectedUsers"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.AffectedAssets"></label>
+                            <textarea asp-for="InvestigationDetails.AffectedAssets" maxlength="4000" rows="4"></textarea>
+                            <span asp-validation-for="InvestigationDetails.AffectedAssets"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.InvolvedAppsOrTools"></label>
+                            <textarea asp-for="InvestigationDetails.InvolvedAppsOrTools" maxlength="4000" rows="4"></textarea>
+                            <span asp-validation-for="InvestigationDetails.InvolvedAppsOrTools"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.InitialFindings"></label>
+                            <textarea asp-for="InvestigationDetails.InitialFindings" maxlength="4000" rows="5"></textarea>
+                            <span asp-validation-for="InvestigationDetails.InitialFindings"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.ContainmentActions"></label>
+                            <textarea asp-for="InvestigationDetails.ContainmentActions" maxlength="4000" rows="4"></textarea>
+                            <span asp-validation-for="InvestigationDetails.ContainmentActions"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.IocSummary"></label>
+                            <textarea asp-for="InvestigationDetails.IocSummary" maxlength="4000" rows="4"></textarea>
+                            <span asp-validation-for="InvestigationDetails.IocSummary"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.EscalationReason"></label>
+                            <textarea asp-for="InvestigationDetails.EscalationReason" maxlength="4000" rows="4"></textarea>
+                            <span asp-validation-for="InvestigationDetails.EscalationReason"></span>
+                        </div>
+                        <div class="field field-wide">
+                            <label asp-for="InvestigationDetails.ClosureSummary"></label>
+                            <textarea asp-for="InvestigationDetails.ClosureSummary" maxlength="4000" rows="4"></textarea>
+                            <span asp-validation-for="InvestigationDetails.ClosureSummary"></span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button" type="submit">Save Investigation Details</button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <dl class="investigation-details-list">
+                    <dt>Detection source</dt>
+                    <dd>@FormatDetectionSource(caseRecord.DetectionSource)</dd>
+                    <dt>Alert/report time</dt>
+                    <dd>@FormatDateTime(caseRecord.AlertReportedAtUtc)</dd>
+                    <dt>Affected user(s)</dt>
+                    <dd>@FormatOptional(caseRecord.AffectedUsers)</dd>
+                    <dt>Affected asset(s)</dt>
+                    <dd>@FormatOptional(caseRecord.AffectedAssets)</dd>
+                    <dt>Involved app(s) or tool(s)</dt>
+                    <dd>@FormatOptional(caseRecord.InvolvedAppsOrTools)</dd>
+                    <dt>Initial findings</dt>
+                    <dd>@FormatOptional(caseRecord.InitialFindings)</dd>
+                    <dt>Containment actions</dt>
+                    <dd>@FormatOptional(caseRecord.ContainmentActions)</dd>
+                    <dt>IOC summary</dt>
+                    <dd>@FormatOptional(caseRecord.IocSummary)</dd>
+                    <dt>Escalation reason</dt>
+                    <dd>@FormatOptional(caseRecord.EscalationReason)</dd>
+                    <dt>Closure summary</dt>
+                    <dd>@FormatOptional(caseRecord.ClosureSummary)</dd>
+                </dl>
+            }
         </article>
 
         <article class="workspace-section" id="assignment-history">
@@ -287,5 +382,25 @@
         }
 
         return userDisplay == "Unassigned" ? team : $"{userDisplay} / {team}";
+    }
+
+    private static string FormatDetectionSource(DetectionSource? detectionSource)
+    {
+        return detectionSource?.GetDisplayName() ?? "Not provided";
+    }
+
+    private static string FormatDateTime(DateTimeOffset? value)
+    {
+        return value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "Not provided";
+    }
+
+    private static string FormatDateTimeLocal(DateTimeOffset? value)
+    {
+        return value?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm") ?? string.Empty;
+    }
+
+    private static string FormatOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
     }
 }
