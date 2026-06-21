@@ -235,16 +235,25 @@
         <div class="playbook-steps">
             @foreach (var step in Model.PlaybookSteps)
             {
-                <article class="playbook-step @(step.IsCompleted ? "is-complete" : "is-open")">
+                var canToggleStep = Model.CanWorkCase && !step.IsAutoCompleted;
+                <article class="playbook-step @(step.IsComplete ? "is-complete" : "is-open") @(step.IsAutoCompleted ? "is-auto-complete" : string.Empty)">
                     <form asp-action="TogglePlaybookStep" asp-route-id="@caseRecord.CaseId" method="post">
                         <input type="hidden" name="stepKey" value="@step.Key" />
-                        <input type="hidden" name="completionState" value="@(step.IsCompleted ? "open" : "complete")" />
+                        <input type="hidden" name="completionState" value="@(step.IsManuallyCompleted ? "open" : "complete")" />
                         <label>
-                            <input type="checkbox" checked="@step.IsCompleted" disabled="@(!Model.CanWorkCase)" onchange="this.form.submit()" />
+                            <input type="checkbox" checked="@step.IsComplete" disabled="@(!canToggleStep)" onchange="this.form.submit()" />
                             <span>@step.Title</span>
+                            @if (step.IsAutoCompleted)
+                            {
+                                <span class="playbook-auto-badge" title="@step.AutoCompletionReason">Auto</span>
+                            }
                         </label>
                         <p>@step.Description</p>
-                        @if (!Model.CanWorkCase)
+                        @if (step.IsAutoCompleted)
+                        {
+                            <p class="playbook-auto-note">@step.AutoCompletionReason</p>
+                        }
+                        else if (!Model.CanWorkCase)
                         {
                             <span class="muted">Read-only</span>
                         }

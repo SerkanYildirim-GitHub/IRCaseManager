@@ -27,5 +27,13 @@ public class PlaybookStepViewModel
 
     public required string Description { get; init; }
 
-    public bool IsCompleted { get; init; }
+    public bool IsManuallyCompleted { get; init; }
+
+    public bool IsAutoCompleted { get; init; }
+
+    public bool IsComplete => IsManuallyCompleted || IsAutoCompleted;
+
+    public bool IsCompleted => IsComplete;
+
+    public string? AutoCompletionReason { get; init; }
 }

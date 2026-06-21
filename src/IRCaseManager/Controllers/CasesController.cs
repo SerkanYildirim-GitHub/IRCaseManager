@@ -827,12 +827,18 @@ public class CasesController(
 
         var playbookSteps = playbookDefinitionService
             .GetSteps(irCase.CaseType)
-            .Select(step => new PlaybookStepViewModel
+            .Select(step =>
             {
-                Key = step.Key,
-                Title = step.Title,
-                Description = step.Description,
-                IsCompleted = completedSteps.Contains(step.Key)
+                var autoCompletionReason = GetAutoCompletionReason(irCase, step);
+                return new PlaybookStepViewModel
+                {
+                    Key = step.Key,
+                    Title = step.Title,
+                    Description = step.Description,
+                    IsManuallyCompleted = completedSteps.Contains(step.Key),
+                    IsAutoCompleted = autoCompletionReason is not null,
+                    AutoCompletionReason = autoCompletionReason
+                };
             })
             .ToList();
 
@@ -847,5 +853,45 @@ public class CasesController(
             CanReopenCase = caseAccessService.CanReopenCase(irCase, User),
             CanEscalateCase = caseAccessService.CanEscalateCase(irCase, User)
         };
+    }
+
+    private static string? GetAutoCompletionReason(Case irCase, PlaybookStepDefinition step)
+    {
+        var reasons = new List<string>();
+        var signals = step.AutoCompletionSignals;
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.SourceReference) &&
+            !string.IsNullOrWhiteSpace(irCase.SourceReference))
+        {
+            reasons.Add("source reference is documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.InitialSummary) &&
+            !string.IsNullOrWhiteSpace(irCase.InitialSummary))
+        {
+            reasons.Add("initial summary is documented");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.Evidence) &&
+            irCase.EvidenceItems.Count > 0)
+        {
+            reasons.Add("evidence metadata exists");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.Escalated) &&
+            irCase.Status == CaseStatus.Escalated)
+        {
+            reasons.Add("case is escalated");
+        }
+
+        if (signals.HasFlag(PlaybookAutoCompletionSignals.Closed) &&
+            irCase.Status == CaseStatus.Closed)
+        {
+            reasons.Add("case is closed");
+        }
+
+        return reasons.Count == 0
+            ? null
+            : $"Auto-completed because {string.Join(" and ", reasons)}.";
     }
 }
