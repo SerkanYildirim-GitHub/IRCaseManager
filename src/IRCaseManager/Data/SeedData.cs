@@ -15,6 +15,7 @@ public static class SeedData
 
         await db.Database.EnsureCreatedAsync();
         await EnsureDevelopmentLoginHardeningSchemaAsync(db);
+        await EnsureDevelopmentCaseAssignmentHistorySchemaAsync(db);
         await SeedRolesAsync(db);
         await SeedDevelopmentTestUsersAsync(db, logger);
     }
@@ -88,6 +89,38 @@ public static class SeedData
         }
 
         return columns;
+    }
+
+    private static async Task EnsureDevelopmentCaseAssignmentHistorySchemaAsync(AppDbContext db)
+    {
+        if (!db.Database.IsSqlite())
+        {
+            return;
+        }
+
+        await ExecuteSchemaCommandAsync(db, """
+            CREATE TABLE IF NOT EXISTS CaseAssignmentHistories (
+                Id INTEGER NOT NULL CONSTRAINT PK_CaseAssignmentHistories PRIMARY KEY AUTOINCREMENT,
+                CaseId INTEGER NOT NULL,
+                ActionType TEXT NOT NULL,
+                FromUserId INTEGER NULL,
+                FromTeam TEXT NULL,
+                ToUserId INTEGER NULL,
+                ToTeam TEXT NULL,
+                PerformedByUserId INTEGER NULL,
+                Reason TEXT NULL,
+                OccurredUtc TEXT NOT NULL,
+                CONSTRAINT FK_CaseAssignmentHistories_Cases_CaseId FOREIGN KEY (CaseId) REFERENCES Cases (Id) ON DELETE CASCADE,
+                CONSTRAINT FK_CaseAssignmentHistories_Users_FromUserId FOREIGN KEY (FromUserId) REFERENCES Users (Id) ON DELETE RESTRICT,
+                CONSTRAINT FK_CaseAssignmentHistories_Users_ToUserId FOREIGN KEY (ToUserId) REFERENCES Users (Id) ON DELETE RESTRICT,
+                CONSTRAINT FK_CaseAssignmentHistories_Users_PerformedByUserId FOREIGN KEY (PerformedByUserId) REFERENCES Users (Id) ON DELETE RESTRICT
+            )
+            """);
+
+        await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_CaseAssignmentHistories_CaseId_OccurredUtc ON CaseAssignmentHistories (CaseId, OccurredUtc)");
+        await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_CaseAssignmentHistories_FromUserId ON CaseAssignmentHistories (FromUserId)");
+        await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_CaseAssignmentHistories_ToUserId ON CaseAssignmentHistories (ToUserId)");
+        await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_CaseAssignmentHistories_PerformedByUserId ON CaseAssignmentHistories (PerformedByUserId)");
     }
 
     private static async Task SeedRolesAsync(AppDbContext db)

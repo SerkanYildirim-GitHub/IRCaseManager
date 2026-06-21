@@ -2,6 +2,7 @@
 @{
     var isAdmin = User.IsInRole(RoleNames.Admin);
     var isAnalyst = User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2);
+    var userId = User.GetUserId();
     var caseTypes = Model.Select(irCase => irCase.CaseType.GetDisplayName()).Distinct().OrderBy(value => value).ToList();
     var severities = Model.Select(irCase => irCase.Severity.ToString()).Distinct().OrderBy(value => value).ToList();
     var assignedToValues = Model.Select(GetAssignedToDisplayName).Distinct().OrderBy(value => value).ToList();
@@ -114,7 +115,7 @@
                     <td>@irCase.AssignedTeam</td>
                     <td><span class="badge status-@irCase.Status.ToString().ToLowerInvariant()">@irCase.Status</span></td>
                     <td>
-                        @if (CanEditRow(irCase, isAdmin, isAnalyst))
+                        @if (CanEditRow(irCase, isAdmin, isAnalyst, userId))
                         {
                             <a class="button button-compact" asp-controller="Cases" asp-action="Edit" asp-route-id="@irCase.CaseId">Edit</a>
                         }
@@ -150,9 +151,20 @@
         };
     }
 
-    private static bool CanEditRow(Case irCase, bool isAdmin, bool isAnalyst)
+    private static bool CanEditRow(Case irCase, bool isAdmin, bool isAnalyst, int? userId)
     {
-        return isAdmin || (isAnalyst && irCase.Status != CaseStatus.Closed);
+        return isAdmin ||
+            (isAnalyst &&
+             userId is not null &&
+             irCase.Status != CaseStatus.Closed &&
+             (irCase.Assignments.Any(assignment => assignment.ApplicationUserId == userId.Value) ||
+              (irCase.Status != CaseStatus.Escalated &&
+               (irCase.CreatedById == userId.Value || IsUnassignedAnalystVisibleCase(irCase)))));
     }
 
+    private static bool IsUnassignedAnalystVisibleCase(Case irCase)
+    {
+        var analystVisibleValues = new[] { "Default", "Analyst", "Analysts", "AnalystOnly", "All" };
+        return !irCase.Assignments.Any() && analystVisibleValues.Contains(irCase.Visibility, StringComparer.Ordinal);
+    }
 }

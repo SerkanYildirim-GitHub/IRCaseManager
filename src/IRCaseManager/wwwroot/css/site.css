@@ -210,6 +210,13 @@ textarea { resize: vertical; }
 .evidence-item dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 12px; margin: 0; }
 .evidence-item dt { color: var(--muted); font-weight: 800; }
 .evidence-item dd { margin: 0; white-space: pre-wrap; }
+.assignment-history-list { display: grid; gap: 12px; }
+.assignment-history-item { padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-strong); }
+.assignment-history-item > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.assignment-history-item > div span { color: var(--muted); font-weight: 700; white-space: nowrap; }
+.assignment-history-item dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 12px; margin: 0; }
+.assignment-history-item dt { color: var(--muted); font-weight: 800; }
+.assignment-history-item dd { margin: 0; white-space: pre-wrap; }
 .overview-list { display: grid; grid-template-columns: 150px minmax(0, 1fr) 150px minmax(0, 1fr); gap: 12px 18px; margin: 0; }
 .overview-list dt { color: var(--muted); font-weight: 800; }
 .overview-list dd { margin: 0; }
@@ -228,6 +235,7 @@ textarea { resize: vertical; }
   .case-workspace-layout { grid-template-columns: 1fr; }
   .playbook-sidebar { position: static; }
   .topbar, .panel-header, .case-heading { align-items: flex-start; flex-direction: column; }
-  .overview-list, .evidence-item dl { grid-template-columns: 1fr; }
+  .overview-list, .evidence-item dl, .assignment-history-item dl { grid-template-columns: 1fr; }
+  .assignment-history-item > div { align-items: flex-start; flex-direction: column; }
   .content { width: min(100% - 32px, 1180px); }
 }

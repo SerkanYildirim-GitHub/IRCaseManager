@@ -32,7 +32,7 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy(AuthorizationPolicies.CanManageUsers, policy => policy.RequireRole(RoleNames.Admin));
     options.AddPolicy(AuthorizationPolicies.CanDeleteCases, policy => policy.RequireRole(RoleNames.Admin));
-    options.AddPolicy(AuthorizationPolicies.CanReopenCases, policy => policy.RequireRole(RoleNames.Admin, RoleNames.AnalystLevel2));
+    options.AddPolicy(AuthorizationPolicies.CanReopenCases, policy => policy.RequireRole(RoleNames.Admin));
     options.AddPolicy(AuthorizationPolicies.CanCreateCases, policy => policy.RequireRole(RoleNames.Admin, RoleNames.AnalystLevel2, RoleNames.AnalystLevel1));
     options.AddPolicy(AuthorizationPolicies.CanEditCases, policy => policy.RequireRole(RoleNames.Admin, RoleNames.AnalystLevel2, RoleNames.AnalystLevel1));
     options.AddPolicy(AuthorizationPolicies.ReadOnlyAccess, policy => policy.RequireRole(RoleNames.All));

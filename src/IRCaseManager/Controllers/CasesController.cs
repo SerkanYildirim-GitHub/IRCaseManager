@@ -50,6 +50,12 @@ public class CasesController(
             .Include(caseRecord => caseRecord.EvidenceItems)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .Include(caseRecord => caseRecord.TimelineEntries)
+            .Include(caseRecord => caseRecord.AssignmentHistory)
+                .ThenInclude(history => history.FromUser)
+            .Include(caseRecord => caseRecord.AssignmentHistory)
+                .ThenInclude(history => history.ToUser)
+            .Include(caseRecord => caseRecord.AssignmentHistory)
+                .ThenInclude(history => history.PerformedByUser)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
 
         if (irCase is null)
@@ -138,6 +144,17 @@ public class CasesController(
             Summary = "Case record created."
         });
 
+        AddAssignmentHistory(
+            irCase,
+            model.AssignedUserId is null ? "Created" : "Assigned",
+            fromUserId: null,
+            fromTeam: null,
+            toUserId: model.AssignedUserId,
+            toTeam: model.AssignedTeam,
+            performedByUserId: userId.Value,
+            reason: model.AssignedUserId is null ? "Case created without an assigned analyst." : "Case created and assigned.",
+            occurredUtc: openedAt);
+
         await db.SaveChangesAsync();
         TempData["StatusMessage"] = $"Created {irCase.CaseId}.";
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
@@ -162,7 +179,7 @@ public class CasesController(
             return await CaseNotFoundOrForbiddenAsync(id);
         }
 
-        if (!CanEditCase(irCase))
+        if (!caseAccessService.CanEditCase(irCase, User))
         {
             return Forbid();
         }
@@ -206,7 +223,7 @@ public class CasesController(
             return await CaseNotFoundOrForbiddenAsync(id);
         }
 
-        if (!CanEditCase(irCase))
+        if (!caseAccessService.CanEditCase(irCase, User))
         {
             return Forbid();
         }
@@ -230,6 +247,8 @@ public class CasesController(
         }
 
         var now = DateTimeOffset.UtcNow;
+        var previousAssignedUserId = GetCurrentAssignedUserId(irCase);
+        var previousAssignedTeam = irCase.AssignedTeam;
         var caseTypeName = model.CaseType!.Value.GetDisplayName();
         irCase.CaseType = model.CaseType.Value;
         irCase.Title = $"{irCase.CaseId} - {caseTypeName}";
@@ -257,6 +276,22 @@ public class CasesController(
             });
         }
 
+        var assignmentChanged = previousAssignedUserId != selectedAssignedUserId ||
+            !string.Equals(previousAssignedTeam, model.AssignedTeam, StringComparison.Ordinal);
+        if (assignmentChanged)
+        {
+            AddAssignmentHistory(
+                irCase,
+                previousAssignedUserId is null && selectedAssignedUserId is not null ? "Assigned" : "Reassigned",
+                previousAssignedUserId,
+                previousAssignedTeam,
+                selectedAssignedUserId,
+                model.AssignedTeam,
+                userId.Value,
+                "Case assignment updated.",
+                now);
+        }
+
         db.AuditLogs.Add(new AuditLog
         {
             ApplicationUserId = userId,
@@ -271,32 +306,25 @@ public class CasesController(
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
     [HttpPost]
     public async Task<IActionResult> Close(string id)
     {
-        if (!CanCloseCase())
-        {
-            return Forbid();
-        }
-
         var updateResult = await UpdateCaseLifecycleAsync(
             id,
             CaseStatus.Closed,
             closedAt: DateTimeOffset.UtcNow,
             action: "CaseClosed",
-            summary: "Case closed.");
+            summary: "Case closed.",
+            canUpdate: irCase => caseAccessService.CanCloseCase(irCase, User));
 
         return updateResult;
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CanReopenCases)]
     [HttpPost]
     public async Task<IActionResult> Reopen(string id)
     {
-        if (!CanReopenCase())
-        {
-            return Forbid();
-        }
-
         var irCase = await caseAccessService
             .FilterVisibleCases(db.Cases, User)
             .Include(caseRecord => caseRecord.Assignments)
@@ -305,6 +333,11 @@ public class CasesController(
         if (irCase is null)
         {
             return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!caseAccessService.CanReopenCase(irCase, User))
+        {
+            return Forbid();
         }
 
         var userId = User.GetUserId();
@@ -333,40 +366,115 @@ public class CasesController(
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
     [HttpPost]
     public async Task<IActionResult> Escalate(string id)
     {
-        if (!CanEscalateCase())
+        if (string.IsNullOrWhiteSpace(id))
         {
-            return Forbid();
-        }
-
-        var updateResult = await UpdateCaseLifecycleAsync(
-            id,
-            CaseStatus.Escalated,
-            closedAt: null,
-            action: "CaseEscalated",
-            summary: "Case escalated.");
-
-        return updateResult;
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> TogglePlaybookStep(string id, string stepKey, string? completionState)
-    {
-        if (!CanWorkCase())
-        {
-            return Forbid();
+            return NotFound();
         }
 
         var irCase = await caseAccessService
             .FilterVisibleCases(db.Cases, User)
+            .Include(caseRecord => caseRecord.Assignments)
+            .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
+
+        if (irCase is null)
+        {
+            return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!caseAccessService.CanEscalateCase(irCase, User))
+        {
+            return Forbid();
+        }
+
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Challenge();
+        }
+
+        var targetRoleName = GetEscalationTargetRoleName();
+        if (targetRoleName is null)
+        {
+            return Forbid();
+        }
+
+        var targetUser = await GetSingleActiveUserForRoleAsync(targetRoleName);
+        if (targetUser is null)
+        {
+            TempData["StatusMessage"] = $"Unable to identify exactly one active {targetRoleName} user. Case was not escalated.";
+            return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var previousAssignedUserId = GetCurrentAssignedUserId(irCase);
+        var previousAssignedTeam = irCase.AssignedTeam;
+
+        foreach (var assignment in irCase.Assignments.ToList())
+        {
+            db.CaseAssignments.Remove(assignment);
+        }
+
+        db.CaseAssignments.Add(new CaseAssignment
+        {
+            CaseId = irCase.Id,
+            ApplicationUserId = targetUser.Id,
+            AssignedById = userId.Value,
+            AssignedAt = now
+        });
+
+        irCase.Status = CaseStatus.Escalated;
+        irCase.AssignedTeam = targetRoleName;
+        irCase.ClosedAt = null;
+        irCase.UpdatedAt = now;
+        irCase.UpdatedById = userId.Value;
+
+        AddAssignmentHistory(
+            irCase,
+            "Escalated",
+            previousAssignedUserId,
+            previousAssignedTeam,
+            targetUser.Id,
+            targetRoleName,
+            userId.Value,
+            $"Case escalated to {targetRoleName}.",
+            now);
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ApplicationUserId = userId,
+            Action = "CaseEscalated",
+            EntityType = nameof(Case),
+            EntityId = irCase.CaseId,
+            Summary = $"Case escalated to {targetRoleName}."
+        });
+
+        await db.SaveChangesAsync();
+        TempData["StatusMessage"] = $"Escalated {irCase.CaseId} to {targetRoleName}.";
+        return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
+    [HttpPost]
+    public async Task<IActionResult> TogglePlaybookStep(string id, string stepKey, string? completionState)
+    {
+        var irCase = await caseAccessService
+            .FilterVisibleCases(db.Cases, User)
+            .Include(caseRecord => caseRecord.Assignments)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
 
         if (irCase is null)
         {
             return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!caseAccessService.CanModifyPlaybook(irCase, User))
+        {
+            return Forbid();
         }
 
         var definition = playbookDefinitionService
@@ -417,23 +525,25 @@ public class CasesController(
         return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CanEditCases)]
     [HttpPost]
     public async Task<IActionResult> AddEvidence(string id, EvidenceMetadataViewModel model)
     {
-        if (!CanWorkCase())
-        {
-            return Forbid();
-        }
-
-        model.Trim();
-
         var irCase = await caseAccessService
             .FilterVisibleCases(db.Cases, User)
+            .Include(caseRecord => caseRecord.Assignments)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
         if (irCase is null)
         {
             return await CaseNotFoundOrForbiddenAsync(id);
         }
+
+        if (!caseAccessService.CanModifyEvidence(irCase, User))
+        {
+            return Forbid();
+        }
+
+        model.Trim();
 
         if (!ModelState.IsValid)
         {
@@ -445,6 +555,12 @@ public class CasesController(
                 .Include(caseRecord => caseRecord.EvidenceItems)
                 .Include(caseRecord => caseRecord.PlaybookSteps)
                 .Include(caseRecord => caseRecord.TimelineEntries)
+                .Include(caseRecord => caseRecord.AssignmentHistory)
+                    .ThenInclude(history => history.FromUser)
+                .Include(caseRecord => caseRecord.AssignmentHistory)
+                    .ThenInclude(history => history.ToUser)
+                .Include(caseRecord => caseRecord.AssignmentHistory)
+                    .ThenInclude(history => history.PerformedByUser)
                 .SingleAsync(caseRecord => caseRecord.CaseId == id);
 
             var workspace = BuildWorkspaceViewModel(reloadedCase, model);
@@ -562,12 +678,87 @@ public class CasesController(
         return int.TryParse(sequence, out var number) ? $"TK-{number:00000}" : "TK-00000";
     }
 
+    private string? GetEscalationTargetRoleName()
+    {
+        if (User.IsInRole(RoleNames.AnalystLevel1))
+        {
+            return RoleNames.AnalystLevel2;
+        }
+
+        if (User.IsInRole(RoleNames.AnalystLevel2))
+        {
+            return RoleNames.Admin;
+        }
+
+        return null;
+    }
+
+    private async Task<ApplicationUser?> GetSingleActiveUserForRoleAsync(string roleName)
+    {
+        var users = await db.Users
+            .AsNoTracking()
+            .Include(applicationUser => applicationUser.Role)
+            .Where(applicationUser =>
+                applicationUser.IsActive &&
+                applicationUser.Role != null &&
+                applicationUser.Role.Name == roleName)
+            .OrderBy(applicationUser => applicationUser.Id)
+            .Take(2)
+            .ToListAsync();
+
+        return users.Count == 1 ? users[0] : null;
+    }
+
+    private static int? GetCurrentAssignedUserId(Case irCase)
+    {
+        return irCase.Assignments
+            .OrderByDescending(assignment => assignment.AssignedAt)
+            .Select(assignment => (int?)assignment.ApplicationUserId)
+            .FirstOrDefault();
+    }
+
+    private void AddAssignmentHistory(
+        Case irCase,
+        string actionType,
+        int? fromUserId,
+        string? fromTeam,
+        int? toUserId,
+        string? toTeam,
+        int performedByUserId,
+        string reason,
+        DateTimeOffset occurredUtc)
+    {
+        var history = new CaseAssignmentHistory
+        {
+            ActionType = actionType,
+            FromUserId = fromUserId,
+            FromTeam = fromTeam,
+            ToUserId = toUserId,
+            ToTeam = toTeam,
+            PerformedByUserId = performedByUserId,
+            Reason = reason,
+            OccurredUtc = occurredUtc
+        };
+
+        if (irCase.Id == 0)
+        {
+            history.Case = irCase;
+        }
+        else
+        {
+            history.CaseId = irCase.Id;
+        }
+
+        db.CaseAssignmentHistories.Add(history);
+    }
+
     private async Task<IActionResult> UpdateCaseLifecycleAsync(
         string id,
         CaseStatus status,
         DateTimeOffset? closedAt,
         string action,
-        string summary)
+        string summary,
+        Func<Case, bool> canUpdate)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -576,10 +767,16 @@ public class CasesController(
 
         var irCase = await caseAccessService
             .FilterVisibleCases(db.Cases, User)
+            .Include(caseRecord => caseRecord.Assignments)
             .SingleOrDefaultAsync(caseRecord => caseRecord.CaseId == id);
         if (irCase is null)
         {
             return await CaseNotFoundOrForbiddenAsync(id);
+        }
+
+        if (!canUpdate(irCase))
+        {
+            return Forbid();
         }
 
         var userId = User.GetUserId();
@@ -619,44 +816,6 @@ public class CasesController(
         return NotFound();
     }
 
-    private bool CanCloseCase()
-    {
-        return User.IsInRole(RoleNames.Admin)
-            || User.IsInRole(RoleNames.AnalystLevel1)
-            || User.IsInRole(RoleNames.AnalystLevel2);
-    }
-
-    private bool CanReopenCase()
-    {
-        return User.IsInRole(RoleNames.Admin)
-            || User.IsInRole(RoleNames.AnalystLevel2);
-    }
-
-    private bool CanEscalateCase()
-    {
-        return User.IsInRole(RoleNames.Admin)
-            || User.IsInRole(RoleNames.AnalystLevel1)
-            || User.IsInRole(RoleNames.AnalystLevel2);
-    }
-
-    private bool CanWorkCase()
-    {
-        return User.IsInRole(RoleNames.Admin)
-            || User.IsInRole(RoleNames.AnalystLevel1)
-            || User.IsInRole(RoleNames.AnalystLevel2);
-    }
-
-    private bool CanEditCase(Case irCase)
-    {
-        if (User.IsInRole(RoleNames.Admin))
-        {
-            return true;
-        }
-
-        return irCase.Status != CaseStatus.Closed &&
-            (User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2));
-    }
-
     private CaseWorkspaceViewModel BuildWorkspaceViewModel(
         Case irCase,
         EvidenceMetadataViewModel? newEvidence = null)
@@ -682,7 +841,11 @@ public class CasesController(
             Case = irCase,
             PlaybookSteps = playbookSteps,
             NewEvidence = newEvidence ?? new EvidenceMetadataViewModel(),
-            CanWorkCase = CanWorkCase()
+            CanWorkCase = caseAccessService.CanModifyEvidence(irCase, User) ||
+                caseAccessService.CanModifyPlaybook(irCase, User),
+            CanCloseCase = caseAccessService.CanCloseCase(irCase, User),
+            CanReopenCase = caseAccessService.CanReopenCase(irCase, User),
+            CanEscalateCase = caseAccessService.CanEscalateCase(irCase, User)
         };
     }
 }

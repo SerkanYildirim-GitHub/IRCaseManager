@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Case> Cases => Set<Case>();
     public DbSet<CaseAssignment> CaseAssignments => Set<CaseAssignment>();
+    public DbSet<CaseAssignmentHistory> CaseAssignmentHistories => Set<CaseAssignmentHistory>();
     public DbSet<EvidenceMetadata> EvidenceMetadata => Set<EvidenceMetadata>();
     public DbSet<CasePlaybookStep> CasePlaybookSteps => Set<CasePlaybookStep>();
     public DbSet<TimelineEntry> TimelineEntries => Set<TimelineEntry>();
@@ -41,6 +42,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasIndex(step => new { step.CaseId, step.StepKey })
             .IsUnique();
 
+        modelBuilder.Entity<CaseAssignmentHistory>()
+            .HasIndex(history => new { history.CaseId, history.OccurredUtc });
+
         modelBuilder.Entity<CaseAssignment>()
             .HasOne(assignment => assignment.Case)
             .WithMany(irCase => irCase.Assignments)
@@ -70,5 +74,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany(irCase => irCase.PlaybookSteps)
             .HasForeignKey(step => step.CaseId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CaseAssignmentHistory>()
+            .HasOne(history => history.Case)
+            .WithMany(irCase => irCase.AssignmentHistory)
+            .HasForeignKey(history => history.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CaseAssignmentHistory>()
+            .HasOne(history => history.FromUser)
+            .WithMany()
+            .HasForeignKey(history => history.FromUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CaseAssignmentHistory>()
+            .HasOne(history => history.ToUser)
+            .WithMany()
+            .HasForeignKey(history => history.ToUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CaseAssignmentHistory>()
+            .HasOne(history => history.PerformedByUser)
+            .WithMany()
+            .HasForeignKey(history => history.PerformedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

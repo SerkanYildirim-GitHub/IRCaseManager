@@ -8,7 +8,11 @@
         .ToList();
     var canClose = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2);
     var canReopen = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel2);
-    var canEscalate = canClose;
+    var userId = User.GetUserId();
+    var canEscalate = userId is not null &&
+        !User.IsInRole(RoleNames.Admin) &&
+        (User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2)) &&
+        Model.Assignments.Any(assignment => assignment.ApplicationUserId == userId.Value);
 }
 
 <section class="case-heading">
@@ -22,7 +26,7 @@
         </div>
     </div>
     <div class="case-actions">
-        @if (canEscalate && Model.Status != CaseStatus.Escalated && Model.Status != CaseStatus.Closed)
+        @if (canEscalate && Model.Status != CaseStatus.Closed)
         {
             <form asp-action="Escalate" asp-route-id="@Model.CaseId" method="post">
                 <button class="button button-secondary" type="submit">Escalate</button>

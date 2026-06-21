@@ -4,12 +4,12 @@
     ViewData["Title"] = caseRecord.CaseId;
     var assignedUsers = caseRecord.Assignments
         .Where(assignment => assignment.ApplicationUser is not null)
-        .Select(assignment => assignment.ApplicationUser!.UserName)
-        .OrderBy(userName => userName)
+        .Select(assignment => GetUserDisplayName(assignment.ApplicationUser))
+        .OrderBy(displayName => displayName)
         .ToList();
-    var canClose = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel1) || User.IsInRole(RoleNames.AnalystLevel2);
-    var canReopen = User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel2);
-    var canEscalate = canClose;
+    var canClose = Model.CanCloseCase;
+    var canReopen = Model.CanReopenCase;
+    var canEscalate = Model.CanEscalateCase;
 }
 
 <section class="case-heading">
@@ -23,7 +23,7 @@
         </div>
     </div>
     <div class="case-actions">
-        @if (canEscalate && caseRecord.Status != CaseStatus.Escalated && caseRecord.Status != CaseStatus.Closed)
+        @if (canEscalate && caseRecord.Status != CaseStatus.Closed)
         {
             <form asp-action="Escalate" asp-route-id="@caseRecord.CaseId" method="post">
                 <button class="button button-secondary" type="submit">Escalate</button>
@@ -81,6 +81,40 @@
                 <h3>Initial Summary</h3>
                 <p>@caseRecord.InitialSummary</p>
             </div>
+        </article>
+
+        <article class="workspace-section" id="assignment-history">
+            <div class="panel-header">
+                <h2>Assignment History</h2>
+            </div>
+            @if (caseRecord.AssignmentHistory.Count == 0)
+            {
+                <p class="empty-state">No assignment or escalation history has been recorded yet.</p>
+            }
+            else
+            {
+                <div class="assignment-history-list">
+                    @foreach (var history in caseRecord.AssignmentHistory.OrderByDescending(item => item.OccurredUtc))
+                    {
+                        <article class="assignment-history-item">
+                            <div>
+                                <strong>@history.ActionType</strong>
+                                <span>@history.OccurredUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                            </div>
+                            <dl>
+                                <dt>From</dt>
+                                <dd>@FormatAssignmentParty(history.FromUser, history.FromTeam)</dd>
+                                <dt>To</dt>
+                                <dd>@FormatAssignmentParty(history.ToUser, history.ToTeam)</dd>
+                                <dt>Performed by</dt>
+                                <dd>@GetUserDisplayName(history.PerformedByUser)</dd>
+                                <dt>Note</dt>
+                                <dd>@(string.IsNullOrWhiteSpace(history.Reason) ? "Not provided" : history.Reason)</dd>
+                            </dl>
+                        </article>
+                    }
+                </div>
+            }
         </article>
 
         <article class="workspace-section" id="evidence">
@@ -220,3 +254,29 @@
         </div>
     </aside>
 </section>
+
+@functions {
+    private static string GetUserDisplayName(ApplicationUser? user)
+    {
+        return user?.UserName switch
+        {
+            null => "Unassigned",
+            "analyst.l1.local" => RoleNames.AnalystLevel1,
+            "analyst.l2.local" => RoleNames.AnalystLevel2,
+            "admin.local" => RoleNames.Admin,
+            "auditor.local" => RoleNames.Auditor,
+            _ => user.UserName
+        };
+    }
+
+    private static string FormatAssignmentParty(ApplicationUser? user, string? team)
+    {
+        var userDisplay = GetUserDisplayName(user);
+        if (string.IsNullOrWhiteSpace(team))
+        {
+            return userDisplay;
+        }
+
+        return userDisplay == "Unassigned" ? team : $"{userDisplay} / {team}";
+    }
+}

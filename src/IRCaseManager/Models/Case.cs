@@ -48,6 +48,8 @@ public class Case
 
     public ICollection<CaseAssignment> Assignments { get; set; } = [];
 
+    public ICollection<CaseAssignmentHistory> AssignmentHistory { get; set; } = [];
+
     public ICollection<EvidenceMetadata> EvidenceItems { get; set; } = [];
 
     public ICollection<TimelineEntry> TimelineEntries { get; set; } = [];

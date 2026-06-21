@@ -11,6 +11,12 @@ public class CaseWorkspaceViewModel
     public EvidenceMetadataViewModel NewEvidence { get; init; } = new();
 
     public bool CanWorkCase { get; init; }
+
+    public bool CanCloseCase { get; init; }
+
+    public bool CanReopenCase { get; init; }
+
+    public bool CanEscalateCase { get; init; }
 }
 
 public class PlaybookStepViewModel
