@@ -12,6 +12,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<CaseIdGenerator>();
 builder.Services.AddScoped<CaseAccessService>();
+builder.Services.AddSingleton<LoginRateLimiter>();
 builder.Services.AddSingleton<PlaybookDefinitionService>();
 
 builder.Services

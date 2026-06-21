@@ -2,6 +2,7 @@ using System.Security.Claims;
 using IRCaseManager.Data;
 using IRCaseManager.Models;
 using IRCaseManager.Security;
+using IRCaseManager.Services;
 using IRCaseManager.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -12,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IRCaseManager.Controllers;
 
-public class AccountController(AppDbContext db) : Controller
+public class AccountController(AppDbContext db, LoginRateLimiter loginRateLimiter) : Controller
 {
     private const string GenericLoginFailureMessage = "Invalid username or password.";
 
@@ -30,6 +31,12 @@ public class AccountController(AppDbContext db) : Controller
     {
         model.UserName = model.UserName?.Trim() ?? string.Empty;
         ViewData["ReturnUrl"] = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
+
+        if (!loginRateLimiter.IsAllowed(HttpContext, DateTimeOffset.UtcNow))
+        {
+            ModelState.AddModelError(string.Empty, GenericLoginFailureMessage);
+            return View(model);
+        }
 
         if (!ModelState.IsValid)
         {
