@@ -21,6 +21,12 @@ public class ApplicationUser
 
     public DateTimeOffset? LastLoginAt { get; set; }
 
+    public int FailedLoginAttempts { get; set; }
+
+    public DateTimeOffset? LockoutEndUtc { get; set; }
+
+    public DateTimeOffset? LastFailedLoginUtc { get; set; }
+
     public int RoleId { get; set; }
 
     public Role? Role { get; set; }

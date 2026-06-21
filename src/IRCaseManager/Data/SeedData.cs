@@ -14,8 +14,80 @@ public static class SeedData
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DevelopmentSeed");
 
         await db.Database.EnsureCreatedAsync();
+        await EnsureDevelopmentLoginHardeningSchemaAsync(db);
         await SeedRolesAsync(db);
         await SeedDevelopmentTestUsersAsync(db, logger);
+    }
+
+    private static async Task EnsureDevelopmentLoginHardeningSchemaAsync(AppDbContext db)
+    {
+        if (!db.Database.IsSqlite())
+        {
+            return;
+        }
+
+        var existingColumns = await GetUserColumnNamesAsync(db);
+        var columnsToAdd = new Dictionary<string, string>
+        {
+            [nameof(ApplicationUser.FailedLoginAttempts)] = "INTEGER NOT NULL DEFAULT 0",
+            [nameof(ApplicationUser.LockoutEndUtc)] = "TEXT NULL",
+            [nameof(ApplicationUser.LastFailedLoginUtc)] = "TEXT NULL"
+        };
+
+        foreach (var column in columnsToAdd)
+        {
+            if (!existingColumns.Contains(column.Key))
+            {
+                await ExecuteSchemaCommandAsync(db, $"ALTER TABLE Users ADD COLUMN {column.Key} {column.Value}");
+            }
+        }
+    }
+
+    private static async Task ExecuteSchemaCommandAsync(AppDbContext db, string commandText)
+    {
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        await command.ExecuteNonQueryAsync();
+
+        if (shouldClose)
+        {
+            await connection.CloseAsync();
+        }
+    }
+
+    private static async Task<HashSet<string>> GetUserColumnNamesAsync(AppDbContext db)
+    {
+        var columns = new HashSet<string>(StringComparer.Ordinal);
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info('Users')";
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        if (shouldClose)
+        {
+            await connection.CloseAsync();
+        }
+
+        return columns;
     }
 
     private static async Task SeedRolesAsync(AppDbContext db)

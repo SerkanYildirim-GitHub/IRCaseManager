@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using IRCaseManager.Data;
 using IRCaseManager.Models;
+using IRCaseManager.Security;
 using IRCaseManager.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -13,6 +14,8 @@ namespace IRCaseManager.Controllers;
 
 public class AccountController(AppDbContext db) : Controller
 {
+    private const string GenericLoginFailureMessage = "Invalid username or password.";
+
     [AllowAnonymous]
     [HttpGet]
     public IActionResult Login(string? returnUrl = null)
@@ -25,7 +28,7 @@ public class AccountController(AppDbContext db) : Controller
     [HttpPost]
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
     {
-        model.UserName = model.UserName.Trim();
+        model.UserName = model.UserName?.Trim() ?? string.Empty;
         ViewData["ReturnUrl"] = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
         if (!ModelState.IsValid)
@@ -33,35 +36,74 @@ public class AccountController(AppDbContext db) : Controller
             return View(model);
         }
 
+        var normalizedUserName = model.UserName.Trim();
+        model.UserName = normalizedUserName;
+
         var user = await db.Users
             .Include(applicationUser => applicationUser.Role)
-            .SingleOrDefaultAsync(applicationUser => applicationUser.UserName == model.UserName && applicationUser.IsActive);
+            .SingleOrDefaultAsync(applicationUser => applicationUser.UserName == normalizedUserName);
 
-        var verified = user is not null &&
-            new PasswordHasher<ApplicationUser>().VerifyHashedPassword(user, user.PasswordHash, model.Password) != PasswordVerificationResult.Failed;
-
-        if (!verified || user?.Role is null)
+        var now = DateTimeOffset.UtcNow;
+        if (user?.LockoutEndUtc is not null && user.LockoutEndUtc <= now)
         {
-            ModelState.AddModelError(string.Empty, "Invalid username or password.");
+            user.LockoutEndUtc = null;
+            user.FailedLoginAttempts = 0;
+        }
+
+        if (user?.LockoutEndUtc is not null && user.LockoutEndUtc > now)
+        {
+            AddLoginAudit(user, normalizedUserName, "LoginLockedOut", "Local login rejected.");
+            await db.SaveChangesAsync();
+            ModelState.AddModelError(string.Empty, GenericLoginFailureMessage);
             return View(model);
         }
 
-        user.LastLoginAt = DateTimeOffset.UtcNow;
-        db.AuditLogs.Add(new AuditLog
+        var canVerifyPassword = user is not null && user.IsActive && user.Role is not null;
+        var passwordVerification = canVerifyPassword
+            ? new PasswordHasher<ApplicationUser>().VerifyHashedPassword(user!, user!.PasswordHash, model.Password)
+            : PasswordVerificationResult.Failed;
+
+        if (passwordVerification == PasswordVerificationResult.Failed || !canVerifyPassword)
         {
-            ApplicationUserId = user.Id,
-            Action = "Login",
-            EntityType = nameof(ApplicationUser),
-            EntityId = user.UserName,
-            Summary = "Local user login."
-        });
+            if (user is not null && user.IsActive && user.Role is not null)
+            {
+                user.FailedLoginAttempts += 1;
+                user.LastFailedLoginUtc = now;
+
+                var auditAction = "LoginFailed";
+                var auditSummary = "Local login failed.";
+                if (user.FailedLoginAttempts >= LoginLockoutPolicy.MaxFailedAttempts)
+                {
+                    user.LockoutEndUtc = now.Add(LoginLockoutPolicy.LockoutDuration);
+                    auditAction = "LoginLockoutStarted";
+                    auditSummary = "Local login failed and temporary account lockout started.";
+                }
+
+                AddLoginAudit(user, normalizedUserName, auditAction, auditSummary);
+            }
+            else
+            {
+                AddLoginAudit(null, normalizedUserName, "LoginFailed", "Local login failed.");
+            }
+
+            await db.SaveChangesAsync();
+            ModelState.AddModelError(string.Empty, GenericLoginFailureMessage);
+            return View(model);
+        }
+
+        user!.LastLoginAt = now;
+        user.FailedLoginAttempts = 0;
+        user.LastFailedLoginUtc = null;
+        user.LockoutEndUtc = null;
+        AddLoginAudit(user, normalizedUserName, "Login", "Local user login.");
+        var roleName = user.Role!.Name;
         await db.SaveChangesAsync();
 
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.UserName),
-            new(ClaimTypes.Role, user.Role.Name)
+            new(ClaimTypes.Role, roleName)
         };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -95,5 +137,41 @@ public class AccountController(AppDbContext db) : Controller
     public IActionResult AccessDenied()
     {
         return View();
+    }
+
+    private void AddLoginAudit(ApplicationUser? user, string userName, string action, string summary)
+    {
+        db.AuditLogs.Add(new AuditLog
+        {
+            ApplicationUserId = user?.Id,
+            Action = action,
+            EntityType = nameof(ApplicationUser),
+            EntityId = Truncate(user?.UserName ?? userName, 80),
+            Summary = BuildLoginAuditSummary(summary)
+        });
+    }
+
+    private string BuildLoginAuditSummary(string summary)
+    {
+        var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = Request.Headers.UserAgent.ToString();
+
+        var details = summary;
+        if (!string.IsNullOrWhiteSpace(remoteIp))
+        {
+            details += $" RemoteIp={remoteIp}.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(userAgent))
+        {
+            details += $" UserAgent={Truncate(userAgent, 180)}.";
+        }
+
+        return Truncate(details, 512);
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 }
