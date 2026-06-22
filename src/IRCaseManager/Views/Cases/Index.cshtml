@@ -6,26 +6,6 @@
 }
 
 <section class="metric-grid case-summary-grid" aria-label="Case queue shortcuts">
-    <a class="metric severity-critical metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Critical ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Critical">
-        <span>Critical</span>
-        <strong>@summary.CriticalCases</strong>
-    </a>
-    <a class="metric severity-high metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.High ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="High">
-        <span>High</span>
-        <strong>@summary.HighCases</strong>
-    </a>
-    <a class="metric severity-medium metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Medium ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Medium">
-        <span>Medium</span>
-        <strong>@summary.MediumCases</strong>
-    </a>
-    <a class="metric severity-low metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Low ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Low">
-        <span>Low</span>
-        <strong>@summary.LowCases</strong>
-    </a>
-    <a class="metric severity-informational metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Informational ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Informational">
-        <span>Informational</span>
-        <strong>@summary.InformationalCases</strong>
-    </a>
     <article class="metric metric-neutral metric-total case-summary-tile case-summary-total @(noActiveQueueFilter ? "is-active" : string.Empty)">
         <a class="case-summary-total-link" asp-action="Index" aria-label="Show all cases">
             <span>Total Cases</span>
@@ -46,6 +26,26 @@
             </a>
         </div>
     </article>
+    <a class="metric severity-critical metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Critical ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Critical">
+        <span>Critical</span>
+        <strong>@summary.CriticalCases</strong>
+    </a>
+    <a class="metric severity-high metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.High ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="High">
+        <span>High</span>
+        <strong>@summary.HighCases</strong>
+    </a>
+    <a class="metric severity-medium metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Medium ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Medium">
+        <span>Medium</span>
+        <strong>@summary.MediumCases</strong>
+    </a>
+    <a class="metric severity-low metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Low ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Low">
+        <span>Low</span>
+        <strong>@summary.LowCases</strong>
+    </a>
+    <a class="metric severity-informational metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Informational ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Informational">
+        <span>Informational</span>
+        <strong>@summary.InformationalCases</strong>
+    </a>
 </section>
 
 <section class="panel">

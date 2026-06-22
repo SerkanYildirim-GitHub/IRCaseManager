@@ -4,6 +4,8 @@
 }
 
 <section class="analytics-heading" aria-label="Analytics controls and case intake trend">
+    <div class="analytics-heading-row">
+        <h2>Cases by Time</h2>
     <form class="analytics-range-form" asp-action="Analytics" method="get" data-analytics-range-form>
         <div class="field">
             <label class="sr-only" for="analytics-range">Range</label>
@@ -32,6 +34,7 @@
         </div>
         <button class="button analytics-custom-apply" type="submit" data-analytics-custom-apply hidden="@(Model.SelectedRange != "custom")">Apply</button>
     </form>
+    </div>
     @{
         var trendBuckets = Model.CreatedOverTime;
         var trendLabelInterval = GetTrendLabelInterval(trendBuckets.Count);
