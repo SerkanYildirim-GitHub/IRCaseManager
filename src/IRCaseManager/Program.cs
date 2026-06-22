@@ -14,6 +14,7 @@ builder.Services.AddScoped<CaseIdGenerator>();
 builder.Services.AddScoped<CaseAccessService>();
 builder.Services.AddSingleton<LoginRateLimiter>();
 builder.Services.AddSingleton<PlaybookDefinitionService>();
+builder.Services.AddSingleton<ReadinessQuestionCatalog>();
 
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

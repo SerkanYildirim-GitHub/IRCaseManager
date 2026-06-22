@@ -17,6 +17,7 @@ public static class SeedData
         await EnsureDevelopmentLoginHardeningSchemaAsync(db);
         await EnsureDevelopmentCaseAssignmentHistorySchemaAsync(db);
         await EnsureDevelopmentCaseInvestigationSchemaAsync(db);
+        await EnsureDevelopmentReadinessAnswerSchemaAsync(db);
         await SeedRolesAsync(db);
         await SeedDevelopmentTestUsersAsync(db, logger);
     }
@@ -180,6 +181,30 @@ public static class SeedData
         }
 
         return columns;
+    }
+
+    private static async Task EnsureDevelopmentReadinessAnswerSchemaAsync(AppDbContext db)
+    {
+        if (!db.Database.IsSqlite())
+        {
+            return;
+        }
+
+        await ExecuteSchemaCommandAsync(db, """
+            CREATE TABLE IF NOT EXISTS ReadinessAnswers (
+                Id INTEGER NOT NULL CONSTRAINT PK_ReadinessAnswers PRIMARY KEY AUTOINCREMENT,
+                QuestionKey TEXT NOT NULL,
+                SectionName TEXT NOT NULL,
+                AnswerValue TEXT NULL,
+                Comment TEXT NULL,
+                UpdatedAtUtc TEXT NULL,
+                UpdatedByUserId INTEGER NULL,
+                CONSTRAINT FK_ReadinessAnswers_Users_UpdatedByUserId FOREIGN KEY (UpdatedByUserId) REFERENCES Users (Id) ON DELETE RESTRICT
+            )
+            """);
+
+        await ExecuteSchemaCommandAsync(db, "CREATE UNIQUE INDEX IF NOT EXISTS IX_ReadinessAnswers_QuestionKey ON ReadinessAnswers (QuestionKey)");
+        await ExecuteSchemaCommandAsync(db, "CREATE INDEX IF NOT EXISTS IX_ReadinessAnswers_UpdatedByUserId ON ReadinessAnswers (UpdatedByUserId)");
     }
 
     private static async Task SeedRolesAsync(AppDbContext db)

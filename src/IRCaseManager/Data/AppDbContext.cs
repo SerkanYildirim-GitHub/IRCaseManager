@@ -14,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CasePlaybookStep> CasePlaybookSteps => Set<CasePlaybookStep>();
     public DbSet<TimelineEntry> TimelineEntries => Set<TimelineEntry>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ReadinessAnswer> ReadinessAnswers => Set<ReadinessAnswer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<CaseAssignmentHistory>()
             .HasIndex(history => new { history.CaseId, history.OccurredUtc });
+
+        modelBuilder.Entity<ReadinessAnswer>()
+            .HasIndex(answer => answer.QuestionKey)
+            .IsUnique();
 
         modelBuilder.Entity<CaseAssignment>()
             .HasOne(assignment => assignment.Case)
@@ -109,6 +114,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasOne(history => history.PerformedByUser)
             .WithMany()
             .HasForeignKey(history => history.PerformedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ReadinessAnswer>()
+            .HasOne(answer => answer.UpdatedByUser)
+            .WithMany()
+            .HasForeignKey(answer => answer.UpdatedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

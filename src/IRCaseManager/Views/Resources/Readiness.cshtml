@@ -1,0 +1,156 @@
+@model IRCaseManager.ViewModels.ReadinessViewModel
+@{
+    ViewData["Title"] = "IR Readiness Check";
+    var overallPercent = Model.Overall.Percentage?.ToString() ?? "Not Started";
+    var lastUpdated = Model.Overall.LastUpdatedAtUtc is null
+        ? null
+        : Model.Overall.LastUpdatedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+}
+
+<section class="readiness-page-header">
+    <div>
+        <p class="muted">Current cyber incident readiness posture for this organization.</p>
+        @if (lastUpdated is not null)
+        {
+            <p class="muted readiness-last-updated">Last updated by @Model.Overall.LastUpdatedBy on @lastUpdated</p>
+        }
+    </div>
+</section>
+
+<section class="readiness-hero readiness-@Model.Overall.StatusClass" style="--readiness-fill: @Model.Overall.FillPercent%;">
+    <div class="readiness-hero-content">
+        <div>
+            <span class="eyebrow">Readiness</span>
+            <strong>@(Model.Overall.Percentage is null ? "Not Started" : $"{overallPercent}%")</strong>
+            <span>@Model.Overall.StatusLabel</span>
+        </div>
+        <dl>
+            <div>
+                <dt>Unanswered</dt>
+                <dd>@Model.Overall.UnansweredCount</dd>
+            </div>
+            <div>
+                <dt>High-Risk Gaps</dt>
+                <dd>@Model.Overall.HighRiskGapCount</dd>
+            </div>
+        </dl>
+    </div>
+    <div class="readiness-fill" aria-hidden="true"></div>
+</section>
+
+<section class="readiness-section-summary" aria-label="Readiness section scores">
+    @foreach (var readinessSection in Model.Sections)
+    {
+        <article class="readiness-section-card readiness-@readinessSection.Score.StatusClass">
+            <span>@GetShortSectionName(readinessSection.SectionName)</span>
+            <strong>@(readinessSection.Score.Percentage is null ? "0%" : $"{readinessSection.Score.Percentage}%")</strong>
+            <small>@readinessSection.Score.HighRiskGapCount gaps &middot; @readinessSection.Score.UnverifiedGapCount unverified</small>
+        </article>
+    }
+</section>
+
+<form id="readiness-form" asp-action="Readiness" method="post" class="readiness-form" data-readiness-accordion>
+    <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+    <div class="workspace-section-controls readiness-section-controls">
+        @if (Model.CanEdit)
+        {
+            <button class="button button-compact" type="submit">Save Changes</button>
+        }
+        <button class="button button-secondary button-compact" type="button" data-readiness-toggle-all>Expand All</button>
+    </div>
+    @{
+        var answerIndex = 0;
+    }
+    @foreach (var readinessSection in Model.Sections)
+    {
+        <details class="workspace-section workspace-details readiness-details">
+            <summary class="workspace-summary">
+                <div>
+                    <h2>@readinessSection.SectionName</h2>
+                    <p class="muted">@(readinessSection.Score.Percentage is null ? "Not Started" : $"{readinessSection.Score.Percentage}% ready") &middot; @readinessSection.Score.HighRiskGapCount high-risk gaps &middot; @readinessSection.Score.UnverifiedGapCount unverified</p>
+                </div>
+            </summary>
+            <div class="workspace-section-body readiness-question-list">
+                @foreach (var question in readinessSection.Questions)
+                {
+                    var isAnswered = !string.IsNullOrWhiteSpace(question.AnswerValue);
+                    <article class="readiness-question @(isAnswered ? "readiness-question--answered" : string.Empty)">
+                        <input type="hidden" name="Answers[@answerIndex].QuestionKey" value="@question.QuestionKey" />
+                        <div class="readiness-question-main">
+                            <p>@question.QuestionText</p>
+                        </div>
+                        <div class="readiness-answer-controls">
+                            <label class="sr-only" for="answer-@answerIndex">Readiness answer</label>
+                            <select id="answer-@answerIndex" name="Answers[@answerIndex].AnswerValue" disabled="@(!Model.CanEdit)">
+                                <option value="">Unanswered</option>
+                                @foreach (var option in Model.AnswerOptions)
+                                {
+                                    <option value="@option" selected="@(question.AnswerValue == option)">@option</option>
+                                }
+                            </select>
+                            @if (Model.CanEdit)
+                            {
+                                var hasNote = !string.IsNullOrWhiteSpace(question.Comment);
+                                <button class="button button-secondary button-compact readiness-note-toggle @(hasNote ? "has-note" : string.Empty)"
+                                        type="button"
+                                        data-readiness-note-toggle
+                                        aria-expanded="false"
+                                        aria-controls="note-editor-@answerIndex">
+                                    @(hasNote ? "View Note" : "Add Note")
+                                </button>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(question.Comment))
+                            {
+                                <button class="button button-secondary button-compact readiness-note-toggle has-note"
+                                        type="button"
+                                        data-readiness-note-toggle
+                                        aria-expanded="false"
+                                        aria-controls="note-editor-@answerIndex">
+                                    View Note
+                                </button>
+                            }
+                        </div>
+                        @if (Model.CanEdit)
+                        {
+                            <div id="note-editor-@answerIndex" class="readiness-note-editor" data-readiness-note-editor hidden>
+                                <label class="sr-only" for="comment-@answerIndex">Readiness comment</label>
+                                <textarea id="comment-@answerIndex" name="Answers[@answerIndex].Comment" rows="2" maxlength="1500" placeholder="Optional comment or readiness note.">@question.Comment</textarea>
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(question.Comment))
+                        {
+                            <div id="note-editor-@answerIndex" class="readiness-note-editor" data-readiness-note-editor hidden>
+                                <p class="readiness-note-text">@question.Comment</p>
+                            </div>
+                        }
+                    </article>
+                    answerIndex++;
+                }
+            </div>
+        </details>
+    }
+
+    @if (Model.CanEdit)
+    {
+        <div class="form-actions">
+            <button class="button" type="submit">Save Changes</button>
+        </div>
+    }
+    else
+    {
+        <p class="muted">Read-only access. Admin and Analyst Level 2 users can update readiness answers.</p>
+    }
+</form>
+
+@functions {
+    private static string GetShortSectionName(string sectionName)
+    {
+        return sectionName switch
+        {
+            "Detection, Investigation, Analysis, and Activation" => "Detection & Analysis",
+            "Containment, Evidence Collection, and Remediation" => "Containment & Evidence",
+            "Incident Notification and Reporting" => "Notification & Reporting",
+            _ => sectionName
+        };
+    }
+}

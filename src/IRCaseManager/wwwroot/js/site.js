@@ -377,3 +377,58 @@
     element.addEventListener("click", closeModal);
   });
 })();
+
+(function () {
+  const accordion = document.querySelector("[data-readiness-accordion]");
+  if (!accordion) {
+    return;
+  }
+
+  const sections = Array.from(accordion.querySelectorAll(".readiness-details"));
+  const toggleAll = accordion.querySelector("[data-readiness-toggle-all]");
+
+  function syncToggleAllLabel() {
+    if (!toggleAll) {
+      return;
+    }
+
+    const anySectionOpen = sections.some(function (section) {
+      return section.open;
+    });
+
+    toggleAll.textContent = anySectionOpen ? "Collapse All" : "Expand All";
+    toggleAll.setAttribute("aria-label", anySectionOpen ? "Collapse all readiness sections" : "Expand all readiness sections");
+  }
+
+  if (toggleAll) {
+    toggleAll.addEventListener("click", function () {
+      const shouldCollapse = sections.some(function (section) {
+        return section.open;
+      });
+
+      sections.forEach(function (section) {
+        section.open = !shouldCollapse;
+      });
+      syncToggleAllLabel();
+    });
+  }
+
+  sections.forEach(function (section) {
+    section.addEventListener("toggle", syncToggleAllLabel);
+  });
+  syncToggleAllLabel();
+
+  accordion.querySelectorAll("[data-readiness-note-toggle]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      const panelId = button.getAttribute("aria-controls");
+      const panel = panelId ? document.getElementById(panelId) : null;
+      if (!panel) {
+        return;
+      }
+
+      panel.hidden = false;
+      button.hidden = true;
+      button.setAttribute("aria-expanded", "true");
+    });
+  });
+})();
