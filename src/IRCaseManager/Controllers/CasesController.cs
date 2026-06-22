@@ -18,6 +18,10 @@ public class CasesController(
     PlaybookDefinitionService playbookDefinitionService,
     CaseAccessService caseAccessService) : Controller
 {
+    private const string IncidentResponseQueue = "Incident Response";
+    private const string ItSupportQueue = "IT Support";
+    private const string AdminReviewQueue = "Admin Review";
+
     public async Task<IActionResult> Index()
     {
         var visibleCaseSet = await caseAccessService
@@ -25,6 +29,7 @@ public class CasesController(
             .Include(irCase => irCase.CreatedBy)
             .Include(irCase => irCase.Assignments)
                 .ThenInclude(assignment => assignment.ApplicationUser)
+                    .ThenInclude(applicationUser => applicationUser!.Role)
             .ToListAsync();
 
         var cases = visibleCaseSet
@@ -47,6 +52,7 @@ public class CasesController(
             .Include(caseRecord => caseRecord.CreatedBy)
             .Include(caseRecord => caseRecord.Assignments)
                 .ThenInclude(assignment => assignment.ApplicationUser)
+                    .ThenInclude(applicationUser => applicationUser!.Role)
             .Include(caseRecord => caseRecord.EvidenceItems)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .Include(caseRecord => caseRecord.TimelineEntries)
@@ -93,11 +99,13 @@ public class CasesController(
             return Challenge();
         }
 
+        ApplicationUser? assignedUser = null;
         if (model.AssignedUserId is not null)
         {
-            if (!await IsAssignableAnalystAsync(model.AssignedUserId.Value))
+            assignedUser = await GetAssignableCaseUserAsync(model.AssignedUserId.Value);
+            if (assignedUser is null)
             {
-                ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid Analyst Level 1 or Analyst Level 2 user.");
+                ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid assignable user.");
                 await PopulateCreateCaseOptionsAsync();
                 return View(model);
             }
@@ -107,6 +115,7 @@ public class CasesController(
         var caseId = await caseIdGenerator.GenerateAsync(openedAt);
         var sourceReference = GenerateSourceReference(caseId);
         var caseTypeName = model.CaseType!.Value.GetDisplayName();
+        var assignedQueue = assignedUser is null ? model.AssignedTeam : GetQueueForAssignedUser(assignedUser);
         var irCase = new Case
         {
             CaseId = caseId,
@@ -115,7 +124,7 @@ public class CasesController(
             CaseType = model.CaseType!.Value,
             Status = model.AssignedUserId is null ? CaseStatus.New : CaseStatus.Assigned,
             SourceReference = sourceReference,
-            AssignedTeam = model.AssignedTeam,
+            AssignedTeam = assignedQueue,
             OpenedAt = openedAt,
             InitialSummary = model.InitialSummary,
             Visibility = "Default",
@@ -151,7 +160,7 @@ public class CasesController(
             fromUserId: null,
             fromTeam: null,
             toUserId: model.AssignedUserId,
-            toTeam: model.AssignedTeam,
+            toTeam: assignedQueue,
             performedByUserId: userId.Value,
             reason: model.AssignedUserId is null ? "Case created without an assigned analyst." : "Case created and assigned.",
             occurredUtc: openedAt);
@@ -193,7 +202,10 @@ public class CasesController(
             CaseType = irCase.CaseType,
             Severity = irCase.Severity,
             AssignedTeam = irCase.AssignedTeam,
-            AssignedUserId = irCase.Assignments.Select(assignment => (int?)assignment.ApplicationUserId).FirstOrDefault(),
+            AssignedUserId = irCase.Assignments
+                .OrderByDescending(assignment => assignment.AssignedAt)
+                .Select(assignment => (int?)assignment.ApplicationUserId)
+                .FirstOrDefault(),
             InitialSummary = irCase.InitialSummary
         });
     }
@@ -229,9 +241,14 @@ public class CasesController(
             return Forbid();
         }
 
-        if (model.AssignedUserId is not null && !await IsAssignableAnalystAsync(model.AssignedUserId.Value))
+        ApplicationUser? assignedUser = null;
+        if (model.AssignedUserId is not null)
         {
-            ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid Analyst Level 1 or Analyst Level 2 user.");
+            assignedUser = await GetAssignableCaseUserAsync(model.AssignedUserId.Value);
+            if (assignedUser is null)
+            {
+                ModelState.AddModelError(nameof(model.AssignedUserId), "Select a valid assignable user.");
+            }
         }
 
         if (!ModelState.IsValid)
@@ -251,15 +268,16 @@ public class CasesController(
         var previousAssignedUserId = GetCurrentAssignedUserId(irCase);
         var previousAssignedTeam = irCase.AssignedTeam;
         var caseTypeName = model.CaseType!.Value.GetDisplayName();
+        var assignedQueue = assignedUser is null ? model.AssignedTeam : GetQueueForAssignedUser(assignedUser);
         irCase.CaseType = model.CaseType.Value;
         irCase.Title = $"{irCase.CaseId} - {caseTypeName}";
         irCase.Severity = model.Severity!.Value;
-        irCase.AssignedTeam = model.AssignedTeam;
+        irCase.AssignedTeam = assignedQueue;
         irCase.InitialSummary = model.InitialSummary;
         irCase.UpdatedAt = now;
         irCase.UpdatedById = userId.Value;
 
-        var selectedAssignedUserId = model.AssignedUserId;
+        var selectedAssignedUserId = assignedUser?.Id;
         foreach (var assignment in irCase.Assignments.Where(assignment => assignment.ApplicationUserId != selectedAssignedUserId).ToList())
         {
             db.CaseAssignments.Remove(assignment);
@@ -278,7 +296,7 @@ public class CasesController(
         }
 
         var assignmentChanged = previousAssignedUserId != selectedAssignedUserId ||
-            !string.Equals(previousAssignedTeam, model.AssignedTeam, StringComparison.Ordinal);
+            !string.Equals(previousAssignedTeam, assignedQueue, StringComparison.Ordinal);
         if (assignmentChanged)
         {
             AddAssignmentHistory(
@@ -287,7 +305,7 @@ public class CasesController(
                 previousAssignedUserId,
                 previousAssignedTeam,
                 selectedAssignedUserId,
-                model.AssignedTeam,
+                assignedQueue,
                 userId.Value,
                 "Case assignment updated.",
                 now);
@@ -421,6 +439,7 @@ public class CasesController(
         var now = DateTimeOffset.UtcNow;
         var previousAssignedUserId = GetCurrentAssignedUserId(irCase);
         var previousAssignedTeam = irCase.AssignedTeam;
+        var targetQueue = GetQueueForAssignedUser(targetUser);
 
         foreach (var assignment in irCase.Assignments.ToList())
         {
@@ -436,7 +455,7 @@ public class CasesController(
         });
 
         irCase.Status = CaseStatus.Escalated;
-        irCase.AssignedTeam = targetRoleName;
+        irCase.AssignedTeam = targetQueue;
         irCase.ClosedAt = null;
         irCase.UpdatedAt = now;
         irCase.UpdatedById = userId.Value;
@@ -447,7 +466,7 @@ public class CasesController(
             previousAssignedUserId,
             previousAssignedTeam,
             targetUser.Id,
-            targetRoleName,
+            targetQueue,
             userId.Value,
             $"Case escalated to {targetRoleName}.",
             now);
@@ -496,9 +515,9 @@ public class CasesController(
             return NotFound();
         }
 
-        if (GetAutoCompletionReason(irCase, definition) is not null)
+        if (IsAutoManagedStep(definition))
         {
-            TempData["StatusMessage"] = "This playbook step is auto-completed from case data.";
+            TempData["StatusMessage"] = "This playbook step is managed by case data. Update the related investigation field to complete it.";
             return RedirectToAction(nameof(Details), new { id = irCase.CaseId });
         }
 
@@ -568,6 +587,7 @@ public class CasesController(
                 .Include(caseRecord => caseRecord.CreatedBy)
                 .Include(caseRecord => caseRecord.Assignments)
                     .ThenInclude(assignment => assignment.ApplicationUser)
+                        .ThenInclude(applicationUser => applicationUser!.Role)
                 .Include(caseRecord => caseRecord.EvidenceItems)
                 .Include(caseRecord => caseRecord.PlaybookSteps)
                 .Include(caseRecord => caseRecord.TimelineEntries)
@@ -782,8 +802,9 @@ public class CasesController(
     {
         ViewBag.AssignedTeamOptions = new List<SelectListItem>
         {
-            new() { Value = "Incident Response", Text = "Incident Response" },
-            new() { Value = "IT Support", Text = "IT Support" }
+            new() { Value = IncidentResponseQueue, Text = IncidentResponseQueue },
+            new() { Value = ItSupportQueue, Text = ItSupportQueue },
+            new() { Value = AdminReviewQueue, Text = AdminReviewQueue }
         };
 
         var users = await db.Users
@@ -793,7 +814,8 @@ public class CasesController(
                 applicationUser.IsActive &&
                 applicationUser.Role != null &&
                 (applicationUser.Role.Name == RoleNames.AnalystLevel1 ||
-                 applicationUser.Role.Name == RoleNames.AnalystLevel2))
+                 applicationUser.Role.Name == RoleNames.AnalystLevel2 ||
+                 applicationUser.Role.Name == RoleNames.Admin))
             .OrderBy(applicationUser => applicationUser.UserName)
             .Select(applicationUser => new
             {
@@ -807,30 +829,30 @@ public class CasesController(
             .Select(applicationUser => new SelectListItem
             {
                 Value = applicationUser.Id.ToString(),
-                Text = GetAssignedUserOptionText(applicationUser.UserName, applicationUser.RoleName)
+                Text = applicationUser.UserName
             })
             .ToList();
     }
 
-    private async Task<bool> IsAssignableAnalystAsync(int userId)
+    private async Task<ApplicationUser?> GetAssignableCaseUserAsync(int userId)
     {
         return await db.Users
             .Include(applicationUser => applicationUser.Role)
-            .AnyAsync(applicationUser =>
+            .SingleOrDefaultAsync(applicationUser =>
                 applicationUser.Id == userId &&
                 applicationUser.IsActive &&
                 applicationUser.Role != null &&
                 (applicationUser.Role.Name == RoleNames.AnalystLevel1 ||
-                 applicationUser.Role.Name == RoleNames.AnalystLevel2));
+                 applicationUser.Role.Name == RoleNames.AnalystLevel2 ||
+                 applicationUser.Role.Name == RoleNames.Admin));
     }
 
-    private static string GetAssignedUserOptionText(string userName, string roleName)
+    private static string GetQueueForAssignedUser(ApplicationUser applicationUser)
     {
-        return userName switch
+        return applicationUser.Role?.Name switch
         {
-            "analyst.l1.local" => RoleNames.AnalystLevel1,
-            "analyst.l2.local" => RoleNames.AnalystLevel2,
-            _ => $"{userName} ({roleName})"
+            RoleNames.Admin => AdminReviewQueue,
+            _ => IncidentResponseQueue
         };
     }
 
@@ -849,6 +871,7 @@ public class CasesController(
             .Include(caseRecord => caseRecord.CreatedBy)
             .Include(caseRecord => caseRecord.Assignments)
                 .ThenInclude(assignment => assignment.ApplicationUser)
+                    .ThenInclude(applicationUser => applicationUser!.Role)
             .Include(caseRecord => caseRecord.EvidenceItems)
             .Include(caseRecord => caseRecord.PlaybookSteps)
             .Include(caseRecord => caseRecord.TimelineEntries)
@@ -1064,12 +1087,14 @@ public class CasesController(
             .Select(step =>
             {
                 var autoCompletionReason = GetAutoCompletionReason(irCase, step);
+                var isAutoManaged = IsAutoManagedStep(step);
                 return new PlaybookStepViewModel
                 {
                     Key = step.Key,
                     Title = step.Title,
                     Description = step.Description,
-                    IsManuallyCompleted = completedSteps.Contains(step.Key),
+                    IsAutoManaged = isAutoManaged,
+                    IsManuallyCompleted = !isAutoManaged && completedSteps.Contains(step.Key),
                     IsAutoCompleted = autoCompletionReason is not null,
                     AutoCompletionReason = autoCompletionReason
                 };
@@ -1089,6 +1114,11 @@ public class CasesController(
             CanReopenCase = caseAccessService.CanReopenCase(irCase, User),
             CanEscalateCase = caseAccessService.CanEscalateCase(irCase, User)
         };
+    }
+
+    private static bool IsAutoManagedStep(PlaybookStepDefinition step)
+    {
+        return step.AutoCompletionSignals != PlaybookAutoCompletionSignals.None;
     }
 
     private static string? GetAutoCompletionReason(Case irCase, PlaybookStepDefinition step)

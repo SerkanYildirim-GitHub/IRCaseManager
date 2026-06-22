@@ -6,7 +6,7 @@
     var caseTypes = Model.Select(irCase => irCase.CaseType.GetDisplayName()).Distinct().OrderBy(value => value).ToList();
     var severities = Model.Select(irCase => irCase.Severity.ToString()).Distinct().OrderBy(value => value).ToList();
     var assignedToValues = Model.Select(GetAssignedToDisplayName).Distinct().OrderBy(value => value).ToList();
-    var teams = Model.Select(irCase => irCase.AssignedTeam).Distinct().OrderBy(value => value).ToList();
+    var queues = Model.Select(irCase => irCase.AssignedTeam).Distinct().OrderBy(value => value).ToList();
     var statuses = Model.Select(irCase => irCase.Status.ToString()).Distinct().OrderBy(value => value).ToList();
 }
 
@@ -47,12 +47,12 @@
             </select>
         </div>
         <div class="case-filter-field">
-            <label for="case-filter-team">Team</label>
-            <select id="case-filter-team" data-case-filter="team">
+            <label for="case-filter-queue">Queue</label>
+            <select id="case-filter-queue" data-case-filter="queue">
                 <option value="">All</option>
-                @foreach (var team in teams)
+                @foreach (var queue in queues)
                 {
-                    <option value="@team">@team</option>
+                    <option value="@queue">@queue</option>
                 }
             </select>
         </div>
@@ -79,7 +79,8 @@
                 <th>Type</th>
                 <th>Severity</th>
                 <th>Assigned to</th>
-                <th>Team</th>
+                <th>Queue</th>
+                <th>Level</th>
                 <th>Status</th>
                 <th><span class="sr-only">Actions</span></th>
             </tr>
@@ -91,12 +92,13 @@
                 var openedDateOnly = irCase.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd");
                 var caseType = irCase.CaseType.GetDisplayName();
                 var assignedTo = GetAssignedToDisplayName(irCase);
+                var level = GetLevelDisplayName(irCase);
                 <tr data-case-row
                     data-filter-date="@openedDateOnly"
                     data-filter-type="@caseType"
                     data-filter-severity="@irCase.Severity"
                     data-filter-assigned-to="@assignedTo"
-                    data-filter-team="@irCase.AssignedTeam"
+                    data-filter-queue="@irCase.AssignedTeam"
                     data-filter-status="@irCase.Status">
                     <td>@openedDate</td>
                     <td>
@@ -113,6 +115,7 @@
                     <td><span class="badge severity-@irCase.Severity.ToString().ToLowerInvariant()">@irCase.Severity</span></td>
                     <td>@assignedTo</td>
                     <td>@irCase.AssignedTeam</td>
+                    <td>@level</td>
                     <td><span class="badge status-@irCase.Status.ToString().ToLowerInvariant()">@irCase.Status</span></td>
                     <td>
                         @if (CanEditRow(irCase, isAdmin, isAnalyst, userId))
@@ -138,17 +141,26 @@
 @functions {
     private static string GetAssignedToDisplayName(Case irCase)
     {
-        var assignedUserName = irCase.Assignments
-            .Select(assignment => assignment.ApplicationUser?.UserName)
-            .FirstOrDefault(userName => !string.IsNullOrWhiteSpace(userName));
+        return GetAssignedUser(irCase)?.UserName ?? "Unassigned";
+    }
 
-        return assignedUserName switch
+    private static string GetLevelDisplayName(Case irCase)
+    {
+        return GetAssignedUser(irCase)?.Role?.Name switch
         {
-            null => "Unassigned",
-            "analyst.l1.local" => RoleNames.AnalystLevel1,
-            "analyst.l2.local" => RoleNames.AnalystLevel2,
-            _ => assignedUserName
+            RoleNames.AnalystLevel1 => "L1",
+            RoleNames.AnalystLevel2 => "L2",
+            RoleNames.Admin => "Admin",
+            _ => "None"
         };
+    }
+
+    private static ApplicationUser? GetAssignedUser(Case irCase)
+    {
+        return irCase.Assignments
+            .OrderByDescending(assignment => assignment.AssignedAt)
+            .Select(assignment => assignment.ApplicationUser)
+            .FirstOrDefault(applicationUser => applicationUser is not null);
     }
 
     private static bool CanEditRow(Case irCase, bool isAdmin, bool isAnalyst, int? userId)

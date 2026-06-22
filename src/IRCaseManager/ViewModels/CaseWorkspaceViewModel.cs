@@ -33,9 +33,13 @@ public class PlaybookStepViewModel
 
     public bool IsManuallyCompleted { get; init; }
 
+    public bool IsAutoManaged { get; init; }
+
     public bool IsAutoCompleted { get; init; }
 
-    public bool IsComplete => IsManuallyCompleted || IsAutoCompleted;
+    public bool CanManuallyToggle => !IsAutoManaged;
+
+    public bool IsComplete => IsAutoManaged ? IsAutoCompleted : IsManuallyCompleted;
 
     public bool IsCompleted => IsComplete;
 

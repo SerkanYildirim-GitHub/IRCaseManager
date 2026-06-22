@@ -59,7 +59,7 @@
 
   const filterRoot = table.closest(".table-wrap") || document;
   const emptyState = document.querySelector("[data-case-filter-empty]");
-  const filterKeys = ["date", "type", "severity", "assigned-to", "team", "status"];
+  const filterKeys = ["date", "type", "severity", "assigned-to", "queue", "status"];
 
   function normalize(value) {
     return (value || "").trim().toLowerCase();

@@ -12,8 +12,8 @@ public class CreateCaseViewModel : IValidatableObject
     [Display(Name = "Case type")]
     public CaseType? CaseType { get; set; }
 
-    [Required, StringLength(100, MinimumLength = 2)]
-    [Display(Name = "Assigned team")]
+    [StringLength(100)]
+    [Display(Name = "Queue")]
     public string AssignedTeam { get; set; } = string.Empty;
 
     [Display(Name = "Assigned to")]
@@ -41,10 +41,15 @@ public class CreateCaseViewModel : IValidatableObject
             yield return new ValidationResult("Select a valid case type.", [nameof(CaseType)]);
         }
 
-        var allowedTeams = new[] { "Incident Response", "IT Support" };
-        if (!string.IsNullOrWhiteSpace(AssignedTeam) && !allowedTeams.Contains(AssignedTeam, StringComparer.Ordinal))
+        var allowedQueues = new[] { "Incident Response", "IT Support", "Admin Review" };
+        if (AssignedUserId is null && string.IsNullOrWhiteSpace(AssignedTeam))
         {
-            yield return new ValidationResult("Select a valid assigned team.", [nameof(AssignedTeam)]);
+            yield return new ValidationResult("Select a queue.", [nameof(AssignedTeam)]);
+        }
+
+        if (!string.IsNullOrWhiteSpace(AssignedTeam) && !allowedQueues.Contains(AssignedTeam, StringComparer.Ordinal))
+        {
+            yield return new ValidationResult("Select a valid queue.", [nameof(AssignedTeam)]);
         }
     }
 }

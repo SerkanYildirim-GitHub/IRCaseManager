@@ -83,10 +83,12 @@
                 <dd>@caseRecord.CaseType.GetDisplayName()</dd>
                 <dt>Source reference</dt>
                 <dd>@(caseRecord.SourceReference ?? "Not provided")</dd>
-                <dt>Assigned team</dt>
-                <dd>@caseRecord.AssignedTeam</dd>
                 <dt>Assigned to</dt>
                 <dd>@(assignedUsers.Count == 0 ? "Unassigned" : string.Join(", ", assignedUsers))</dd>
+                <dt>Queue</dt>
+                <dd>@caseRecord.AssignedTeam</dd>
+                <dt>Level</dt>
+                <dd>@GetLevelDisplayName(caseRecord)</dd>
                 <dt>Opened</dt>
                 <dd>@caseRecord.OpenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd>
                 <dt>Closed</dt>
@@ -425,7 +427,7 @@
         <div class="playbook-steps">
             @foreach (var step in Model.PlaybookSteps)
             {
-                var canToggleStep = Model.CanWorkCase && !step.IsAutoCompleted;
+                var canToggleStep = Model.CanWorkCase && step.CanManuallyToggle;
                 <details class="playbook-step @(step.IsComplete ? "is-complete playbook-step--complete" : "is-open playbook-step--incomplete") @(step.IsAutoCompleted ? "is-auto-complete" : string.Empty)" open="@(!step.IsComplete)">
                     <summary class="playbook-step-summary">
                         <span class="playbook-status-indicator" aria-hidden="true"></span>
@@ -441,7 +443,14 @@
                         {
                             <p class="playbook-auto-note">@step.AutoCompletionReason</p>
                         }
-                        @if (canToggleStep)
+                        @if (step.IsAutoManaged)
+                        {
+                            @if (!step.IsAutoCompleted)
+                            {
+                                <span class="muted">Complete the related investigation field.</span>
+                            }
+                        }
+                        else if (canToggleStep)
                         {
                             <form class="playbook-step-form" asp-action="TogglePlaybookStep" asp-route-id="@caseRecord.CaseId" method="post">
                                 <input type="hidden" name="stepKey" value="@step.Key" />
@@ -489,26 +498,34 @@
 @functions {
     private static string GetUserDisplayName(ApplicationUser? user)
     {
-        return user?.UserName switch
+        return string.IsNullOrWhiteSpace(user?.UserName) ? "Unassigned" : user.UserName;
+    }
+
+    private static string GetLevelDisplayName(Case irCase)
+    {
+        var assignedUser = irCase.Assignments
+            .OrderByDescending(assignment => assignment.AssignedAt)
+            .Select(assignment => assignment.ApplicationUser)
+            .FirstOrDefault(applicationUser => applicationUser is not null);
+
+        return assignedUser?.Role?.Name switch
         {
-            null => "Unassigned",
-            "analyst.l1.local" => RoleNames.AnalystLevel1,
-            "analyst.l2.local" => RoleNames.AnalystLevel2,
-            "admin.local" => RoleNames.Admin,
-            "auditor.local" => RoleNames.Auditor,
-            _ => user.UserName
+            RoleNames.AnalystLevel1 => "L1",
+            RoleNames.AnalystLevel2 => "L2",
+            RoleNames.Admin => "Admin",
+            _ => "None"
         };
     }
 
-    private static string FormatAssignmentParty(ApplicationUser? user, string? team)
+    private static string FormatAssignmentParty(ApplicationUser? user, string? queue)
     {
         var userDisplay = GetUserDisplayName(user);
-        if (string.IsNullOrWhiteSpace(team))
+        if (string.IsNullOrWhiteSpace(queue))
         {
             return userDisplay;
         }
 
-        return userDisplay == "Unassigned" ? team : $"{userDisplay} / {team}";
+        return userDisplay == "Unassigned" ? queue : $"{userDisplay} / {queue}";
     }
 
     private static string FormatDetectionSource(DetectionSource? detectionSource)

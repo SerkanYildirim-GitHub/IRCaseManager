@@ -26,8 +26,9 @@
 
             <div class="field">
                 <label asp-for="AssignedTeam"></label>
+                <p class="field-help">When a specific analyst is assigned, the queue is set automatically from the assignee.</p>
                 <select asp-for="AssignedTeam" asp-items="ViewBag.AssignedTeamOptions">
-                    <option value="">Select team</option>
+                    <option value="">Select queue</option>
                 </select>
                 <span asp-validation-for="AssignedTeam"></span>
             </div>
