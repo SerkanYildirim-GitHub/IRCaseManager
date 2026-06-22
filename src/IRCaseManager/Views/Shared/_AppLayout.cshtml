@@ -19,22 +19,25 @@
                 </span>
             </a>
             <nav class="nav-section">
-                <a asp-controller="Dashboard" asp-action="Index">Dashboard</a>
-                @if (User.Identity?.IsAuthenticated == true && !User.IsInRole(RoleNames.Auditor))
+                @if (User.Identity?.IsAuthenticated == true)
                 {
-                    <a asp-controller="Cases" asp-action="MyCases">My Cases</a>
+                    <a asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                    @if (!User.IsInRole(RoleNames.Auditor))
+                    {
+                        <a asp-controller="Cases" asp-action="Index">Cases</a>
+                        <a asp-controller="Cases" asp-action="MyCases">My Cases</a>
+                    }
+                    <details class="nav-dropdown">
+                        <summary>Resources</summary>
+                        <div>
+                            <a href="https://attack.mitre.org/" target="_blank" rel="noopener noreferrer">MITRE ATT&amp;CK</a>
+                            <a href="https://www.nist.gov/cyberframework" target="_blank" rel="noopener noreferrer">NIST CSF</a>
+                            <a href="https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final" target="_blank" rel="noopener noreferrer">NIST IR Guidance</a>
+                            <a href="https://www.cisecurity.org/controls" target="_blank" rel="noopener noreferrer">CIS Controls</a>
+                            <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener noreferrer">CISA KEV</a>
+                        </div>
+                    </details>
                 }
-                <a asp-controller="Cases" asp-action="Index">Cases</a>
-                <details class="nav-dropdown">
-                    <summary>Resources</summary>
-                    <div>
-                        <a href="https://attack.mitre.org/" target="_blank" rel="noopener noreferrer">MITRE ATT&amp;CK</a>
-                        <a href="https://www.nist.gov/cyberframework" target="_blank" rel="noopener noreferrer">NIST CSF</a>
-                        <a href="https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final" target="_blank" rel="noopener noreferrer">NIST IR Guidance</a>
-                        <a href="https://www.cisecurity.org/controls" target="_blank" rel="noopener noreferrer">CIS Controls</a>
-                        <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener noreferrer">CISA KEV</a>
-                    </div>
-                </details>
             </nav>
             <div class="sidebar-footer">
                 <span>Powered by Srkn Y</span>

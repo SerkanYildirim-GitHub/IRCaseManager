@@ -1,22 +1,70 @@
-@model IReadOnlyList<Case>
+@model IRCaseManager.ViewModels.CaseListViewModel
 @{
-    ViewData["Title"] = "Cases";
+    ViewData["Title"] = Model.PageTitle;
+    var summary = Model.Summary;
+    var noActiveQueueFilter = Model.SelectedSeverity is null && Model.SelectedStatus is null;
 }
+
+<section class="metric-grid case-summary-grid" aria-label="Case queue shortcuts">
+    <a class="metric severity-critical metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Critical ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Critical">
+        <span>Critical</span>
+        <strong>@summary.CriticalCases</strong>
+    </a>
+    <a class="metric severity-high metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.High ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="High">
+        <span>High</span>
+        <strong>@summary.HighCases</strong>
+    </a>
+    <a class="metric severity-medium metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Medium ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Medium">
+        <span>Medium</span>
+        <strong>@summary.MediumCases</strong>
+    </a>
+    <a class="metric severity-low metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Low ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Low">
+        <span>Low</span>
+        <strong>@summary.LowCases</strong>
+    </a>
+    <a class="metric severity-informational metric-link case-summary-tile @(Model.SelectedSeverity == CaseSeverity.Informational ? "is-active" : string.Empty)" asp-action="Index" asp-route-severity="Informational">
+        <span>Informational</span>
+        <strong>@summary.InformationalCases</strong>
+    </a>
+    <article class="metric metric-neutral metric-total case-summary-tile case-summary-total @(noActiveQueueFilter ? "is-active" : string.Empty)">
+        <a class="case-summary-total-link" asp-action="Index" aria-label="Show all cases">
+            <span>Total Cases</span>
+            <strong>@summary.TotalCases</strong>
+        </a>
+        <div class="case-status-shortcuts" aria-label="Status shortcuts">
+            <a class="case-status-shortcut @(Model.SelectedStatus == CaseStatus.New ? "is-active" : string.Empty)" asp-action="Index" asp-route-status="New">
+                <span>New</span><strong>@summary.NewCases</strong>
+            </a>
+            <a class="case-status-shortcut @(Model.SelectedStatus == CaseStatus.Assigned ? "is-active" : string.Empty)" asp-action="Index" asp-route-status="Assigned">
+                <span>Assigned</span><strong>@summary.AssignedCases</strong>
+            </a>
+            <a class="case-status-shortcut @(Model.SelectedStatus == CaseStatus.Escalated ? "is-active" : string.Empty)" asp-action="Index" asp-route-status="Escalated">
+                <span>Escalated</span><strong>@summary.EscalatedCases</strong>
+            </a>
+            <a class="case-status-shortcut @(Model.SelectedStatus == CaseStatus.Closed ? "is-active" : string.Empty)" asp-action="Index" asp-route-status="Closed">
+                <span>Closed</span><strong>@summary.ClosedCases</strong>
+            </a>
+        </div>
+    </article>
+</section>
 
 <section class="panel">
     <div class="panel-header">
-        <h2>Case Queue</h2>
+        <div>
+            <h2>Case Queue</h2>
+            <p class="muted">@Model.Subtitle</p>
+        </div>
         @if (User.IsInRole(RoleNames.Admin) || User.IsInRole(RoleNames.AnalystLevel2) || User.IsInRole(RoleNames.AnalystLevel1))
         {
             <a class="button" asp-action="Create">Create New Case</a>
         }
     </div>
-    @if (Model.Count == 0)
+    @if (Model.Cases.Count == 0)
     {
-        <p class="muted">No cases exist yet. Create a case to start tracking investigation work.</p>
+        <p class="muted">No cases match this queue view.</p>
     }
     else
     {
-        <partial name="_CaseTable" model="Model" />
+        <partial name="_CaseTable" model="Model.Cases" />
     }
 </section>

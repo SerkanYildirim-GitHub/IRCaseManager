@@ -23,10 +23,14 @@ public class CasesController(
     private const string ItSupportQueue = "IT Support";
     private const string AdminReviewQueue = "Admin Review";
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? severity, string? status)
     {
-        var visibleCaseSet = await caseAccessService
-            .FilterVisibleCases(db.Cases.AsNoTracking(), User)
+        var visibleCases = caseAccessService.FilterVisibleCases(db.Cases.AsNoTracking(), User);
+        var selectedSeverity = ParseSeverityFilter(severity);
+        var selectedStatus = ParseStatusFilter(status);
+        var summary = await BuildCaseQueueSummaryAsync(visibleCases);
+
+        var visibleCaseSet = await ApplyCaseQueueFilters(visibleCases, selectedSeverity, selectedStatus)
             .Include(irCase => irCase.CreatedBy)
             .Include(irCase => irCase.Assignments)
                 .ThenInclude(assignment => assignment.ApplicationUser)
@@ -37,7 +41,15 @@ public class CasesController(
             .OrderByDescending(irCase => irCase.OpenedAt)
             .ToList();
 
-        return View(cases);
+        return View(new CaseListViewModel
+        {
+            Cases = cases,
+            Summary = summary,
+            PageTitle = BuildCaseQueueTitle(selectedSeverity, selectedStatus),
+            Subtitle = BuildCaseQueueSubtitle(selectedSeverity, selectedStatus),
+            SelectedSeverity = selectedSeverity,
+            SelectedStatus = selectedStatus
+        });
     }
 
     [HttpGet]
@@ -63,6 +75,85 @@ public class CasesController(
             .ToList();
 
         return View(cases);
+    }
+
+    private static IQueryable<Case> ApplyCaseQueueFilters(
+        IQueryable<Case> cases,
+        CaseSeverity? severity,
+        CaseStatus? status)
+    {
+        if (severity is not null)
+        {
+            cases = cases.Where(irCase => irCase.Severity == severity.Value);
+        }
+
+        if (status is not null)
+        {
+            cases = cases.Where(irCase => irCase.Status == status.Value);
+        }
+
+        return cases;
+    }
+
+    private static CaseSeverity? ParseSeverityFilter(string? severity)
+    {
+        return Enum.TryParse<CaseSeverity>(severity?.Trim(), ignoreCase: true, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static CaseStatus? ParseStatusFilter(string? status)
+    {
+        return Enum.TryParse<CaseStatus>(status?.Trim(), ignoreCase: true, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static async Task<CaseQueueSummaryViewModel> BuildCaseQueueSummaryAsync(IQueryable<Case> visibleCases)
+    {
+        return new CaseQueueSummaryViewModel
+        {
+            TotalCases = await visibleCases.CountAsync(),
+            CriticalCases = await visibleCases.CountAsync(irCase => irCase.Severity == CaseSeverity.Critical),
+            HighCases = await visibleCases.CountAsync(irCase => irCase.Severity == CaseSeverity.High),
+            MediumCases = await visibleCases.CountAsync(irCase => irCase.Severity == CaseSeverity.Medium),
+            LowCases = await visibleCases.CountAsync(irCase => irCase.Severity == CaseSeverity.Low),
+            InformationalCases = await visibleCases.CountAsync(irCase => irCase.Severity == CaseSeverity.Informational),
+            NewCases = await visibleCases.CountAsync(irCase => irCase.Status == CaseStatus.New),
+            AssignedCases = await visibleCases.CountAsync(irCase => irCase.Status == CaseStatus.Assigned),
+            EscalatedCases = await visibleCases.CountAsync(irCase => irCase.Status == CaseStatus.Escalated),
+            ClosedCases = await visibleCases.CountAsync(irCase => irCase.Status == CaseStatus.Closed)
+        };
+    }
+
+    private static string BuildCaseQueueTitle(CaseSeverity? severity, CaseStatus? status)
+    {
+        if (severity is not null && status is null)
+        {
+            return $"{severity.Value.GetDisplayName()} Cases";
+        }
+
+        if (status is not null && severity is null)
+        {
+            return $"{status.Value.GetDisplayName()} Cases";
+        }
+
+        if (severity is not null && status is not null)
+        {
+            return $"{severity.Value.GetDisplayName()} {status.Value.GetDisplayName()} Cases";
+        }
+
+        return "All Cases";
+    }
+
+    private static string BuildCaseQueueSubtitle(CaseSeverity? severity, CaseStatus? status)
+    {
+        if (severity is null && status is null)
+        {
+            return "All cases you are authorized to view.";
+        }
+
+        return "Filtered case queue based on your authorized case visibility.";
     }
 
     [HttpGet]
