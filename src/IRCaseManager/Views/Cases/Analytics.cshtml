@@ -3,16 +3,11 @@
     ViewData["Title"] = "Case Analytics";
 }
 
-<section class="analytics-heading">
-    <div class="analytics-heading-copy">
-        <p class="eyebrow">Metrics</p>
-        <h2>Case Analytics</h2>
-        <p class="muted">Case activity and distribution for the selected time range.</p>
-    </div>
+<section class="analytics-heading" aria-label="Analytics controls and case intake trend">
     <form class="analytics-range-form" asp-action="Analytics" method="get" data-analytics-range-form>
         <div class="field">
-            <label for="analytics-range">Range</label>
-            <select id="analytics-range" name="range" data-analytics-range-select>
+            <label class="sr-only" for="analytics-range">Range</label>
+            <select id="analytics-range" name="range" data-analytics-range-select aria-label="Analytics time range">
                 <option value="24h" selected="@(Model.SelectedRange == "24h")">Last 24 Hours</option>
                 <option value="7d" selected="@(Model.SelectedRange == "7d")">Last 7 Days</option>
                 <option value="30d" selected="@(Model.SelectedRange == "30d")">Last 30 Days</option>
@@ -20,20 +15,20 @@
             </select>
         </div>
         <div class="field">
-            <label for="analytics-chart">Chart</label>
-            <select id="analytics-chart" name="chart" data-analytics-chart-select>
+            <label class="sr-only" for="analytics-chart">Chart</label>
+            <select id="analytics-chart" name="chart" data-analytics-chart-select aria-label="Analytics chart mode">
                 <option value="donut" selected="@(Model.ChartMode == "donut")">Donut</option>
                 <option value="bar" selected="@(Model.ChartMode == "bar")">Bar</option>
                 <option value="table" selected="@(Model.ChartMode == "table")">Table</option>
             </select>
         </div>
         <div class="field analytics-custom-date-field" data-analytics-custom-date-field hidden="@(Model.SelectedRange != "custom")">
-            <label for="analytics-from">From</label>
-            <input id="analytics-from" name="from" type="date" value="@Model.FromInput" />
+            <label class="sr-only" for="analytics-from">From</label>
+            <input id="analytics-from" name="from" type="date" value="@Model.FromInput" aria-label="Custom range start date" />
         </div>
         <div class="field analytics-custom-date-field" data-analytics-custom-date-field hidden="@(Model.SelectedRange != "custom")">
-            <label for="analytics-to">To</label>
-            <input id="analytics-to" name="to" type="date" value="@Model.ToInput" />
+            <label class="sr-only" for="analytics-to">To</label>
+            <input id="analytics-to" name="to" type="date" value="@Model.ToInput" aria-label="Custom range end date" />
         </div>
         <button class="button analytics-custom-apply" type="submit" data-analytics-custom-apply hidden="@(Model.SelectedRange != "custom")">Apply</button>
     </form>
