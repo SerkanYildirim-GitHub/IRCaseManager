@@ -4,7 +4,7 @@
 }
 
 <section class="analytics-heading">
-    <div>
+    <div class="analytics-heading-copy">
         <p class="eyebrow">Metrics</p>
         <h2>Case Analytics</h2>
         <p class="muted">Case activity and distribution for the selected time range.</p>
@@ -21,7 +21,7 @@
         </div>
         <div class="field">
             <label for="analytics-chart">Chart</label>
-            <select id="analytics-chart" name="chart">
+            <select id="analytics-chart" name="chart" data-analytics-chart-select>
                 <option value="donut" selected="@(Model.ChartMode == "donut")">Donut</option>
                 <option value="bar" selected="@(Model.ChartMode == "bar")">Bar</option>
                 <option value="table" selected="@(Model.ChartMode == "table")">Table</option>
@@ -35,7 +35,7 @@
             <label for="analytics-to">To</label>
             <input id="analytics-to" name="to" type="date" value="@Model.ToInput" />
         </div>
-        <button class="button" type="submit">Apply</button>
+        <button class="button analytics-custom-apply" type="submit" data-analytics-custom-apply hidden="@(Model.SelectedRange != "custom")">Apply</button>
     </form>
 </section>
 
@@ -119,13 +119,12 @@
     {
         var breakdown = Model.BreakdownSections[breakdownIndex];
         var chartId = $"analytics-chart-{breakdownIndex}";
-        <article class="panel analytics-panel" data-analytics-chart-card>
+        <article class="panel analytics-panel" data-analytics-chart-card tabindex="0" aria-label="@($"Open {breakdown.Title} chart larger")">
             <div class="analytics-panel-header">
                 <div>
                     <h2>@breakdown.Title</h2>
                     <p class="muted">@breakdown.Description</p>
                 </div>
-                <button class="button button-secondary button-compact" type="button" data-analytics-expand-chart>View larger</button>
             </div>
             <div class="analytics-card-content" data-analytics-card-content data-analytics-chart-scope>
                 @if (!breakdown.HasData)
@@ -232,7 +231,6 @@
                 <h2 id="analytics-modal-title" data-analytics-modal-title>Chart</h2>
                 <p class="muted" data-analytics-modal-description></p>
             </div>
-            <button class="button button-secondary button-compact" type="button" data-analytics-modal-close>Close</button>
         </div>
         <div class="analytics-modal-content" data-analytics-modal-content></div>
     </section>

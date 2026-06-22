@@ -171,9 +171,20 @@
   }
 
   const rangeSelect = form.querySelector("[data-analytics-range-select]");
+  const chartSelect = form.querySelector("[data-analytics-chart-select]");
   const customFields = Array.from(form.querySelectorAll("[data-analytics-custom-date-field]"));
+  const customApply = form.querySelector("[data-analytics-custom-apply]");
   if (!rangeSelect || customFields.length === 0) {
     return;
+  }
+
+  function submitAnalyticsForm() {
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+      return;
+    }
+
+    form.submit();
   }
 
   function syncCustomDateFields() {
@@ -184,9 +195,23 @@
         input.disabled = !isCustomRange;
       });
     });
+
+    if (customApply) {
+      customApply.hidden = !isCustomRange;
+    }
   }
 
-  rangeSelect.addEventListener("change", syncCustomDateFields);
+  rangeSelect.addEventListener("change", function () {
+    syncCustomDateFields();
+    if (rangeSelect.value !== "custom") {
+      submitAnalyticsForm();
+    }
+  });
+
+  if (chartSelect) {
+    chartSelect.addEventListener("change", submitAnalyticsForm);
+  }
+
   syncCustomDateFields();
 })();
 
@@ -271,6 +296,7 @@
     const segment = event.target.closest("[data-segment-key]");
     if (segment) {
       event.preventDefault();
+      event.stopPropagation();
       toggleSegmentSelection(segment);
     }
   });
@@ -303,10 +329,7 @@
     modal.hidden = false;
     document.body.classList.add("has-analytics-modal");
 
-    const closeButton = modal.querySelector("[data-analytics-modal-close]");
-    if (closeButton) {
-      closeButton.focus();
-    } else if (modalDialog) {
+    if (modalDialog) {
       modalDialog.focus();
     }
   }
@@ -327,12 +350,26 @@
     }
   }
 
-  document.querySelectorAll("[data-analytics-expand-chart]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      const card = button.closest("[data-analytics-chart-card]");
-      if (card) {
-        openModal(card);
+  function isChartInteractionTarget(target) {
+    return Boolean(target.closest("[data-segment-key], button, a, input, select, textarea, label, summary"));
+  }
+
+  document.querySelectorAll("[data-analytics-chart-card]").forEach(function (card) {
+    card.addEventListener("click", function (event) {
+      if (isChartInteractionTarget(event.target)) {
+        return;
       }
+
+      openModal(card);
+    });
+
+    card.addEventListener("keydown", function (event) {
+      if (event.target !== card || (event.key !== "Enter" && event.key !== " ")) {
+        return;
+      }
+
+      event.preventDefault();
+      openModal(card);
     });
   });
 
