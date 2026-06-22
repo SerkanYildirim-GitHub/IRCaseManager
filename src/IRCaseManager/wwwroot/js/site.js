@@ -163,3 +163,29 @@
   }
 
 })();
+
+(function () {
+  const form = document.querySelector("[data-analytics-range-form]");
+  if (!form) {
+    return;
+  }
+
+  const rangeSelect = form.querySelector("[data-analytics-range-select]");
+  const customFields = Array.from(form.querySelectorAll("[data-analytics-custom-date-field]"));
+  if (!rangeSelect || customFields.length === 0) {
+    return;
+  }
+
+  function syncCustomDateFields() {
+    const isCustomRange = rangeSelect.value === "custom";
+    customFields.forEach(function (field) {
+      field.hidden = !isCustomRange;
+      field.querySelectorAll("input").forEach(function (input) {
+        input.disabled = !isCustomRange;
+      });
+    });
+  }
+
+  rangeSelect.addEventListener("change", syncCustomDateFields);
+  syncCustomDateFields();
+})();

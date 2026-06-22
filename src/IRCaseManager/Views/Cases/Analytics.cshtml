@@ -9,21 +9,21 @@
         <h2>Case Analytics</h2>
         <p class="muted">Case activity and distribution for the selected time range.</p>
     </div>
-    <form class="analytics-range-form" asp-action="Analytics" method="get">
+    <form class="analytics-range-form" asp-action="Analytics" method="get" data-analytics-range-form>
         <div class="field">
             <label for="analytics-range">Range</label>
-            <select id="analytics-range" name="range">
+            <select id="analytics-range" name="range" data-analytics-range-select>
                 <option value="24h" selected="@(Model.SelectedRange == "24h")">Last 24 Hours</option>
                 <option value="7d" selected="@(Model.SelectedRange == "7d")">Last 7 Days</option>
                 <option value="30d" selected="@(Model.SelectedRange == "30d")">Last 30 Days</option>
                 <option value="custom" selected="@(Model.SelectedRange == "custom")">Custom Range</option>
             </select>
         </div>
-        <div class="field">
+        <div class="field analytics-custom-date-field" data-analytics-custom-date-field hidden="@(Model.SelectedRange != "custom")">
             <label for="analytics-from">From</label>
             <input id="analytics-from" name="from" type="date" value="@Model.FromInput" />
         </div>
-        <div class="field">
+        <div class="field analytics-custom-date-field" data-analytics-custom-date-field hidden="@(Model.SelectedRange != "custom")">
             <label for="analytics-to">To</label>
             <input id="analytics-to" name="to" type="date" value="@Model.ToInput" />
         </div>
