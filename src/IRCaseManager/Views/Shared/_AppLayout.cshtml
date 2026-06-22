@@ -20,6 +20,10 @@
             </a>
             <nav class="nav-section">
                 <a asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                @if (User.Identity?.IsAuthenticated == true && !User.IsInRole(RoleNames.Auditor))
+                {
+                    <a asp-controller="Cases" asp-action="MyCases">My Cases</a>
+                }
                 <a asp-controller="Cases" asp-action="Index">Cases</a>
                 <details class="nav-dropdown">
                     <summary>Resources</summary>

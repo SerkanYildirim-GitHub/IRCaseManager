@@ -1,0 +1,21 @@
+@model IReadOnlyList<Case>
+@{
+    ViewData["Title"] = "My Cases";
+}
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>My Cases</h2>
+            <p class="muted">Cases currently assigned to you.</p>
+        </div>
+    </div>
+    @if (Model.Count == 0)
+    {
+        <p class="muted">No cases are currently assigned to you.</p>
+    }
+    else
+    {
+        <partial name="_CaseTable" model="Model" />
+    }
+</section>
