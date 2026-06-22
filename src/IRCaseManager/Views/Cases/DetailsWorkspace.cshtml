@@ -302,7 +302,7 @@
                         </div>
                         <div class="field">
                             <label asp-for="NewEvidence.CollectedAt"></label>
-                            <input name="CollectedAt" value="@Model.NewEvidence.CollectedAt?.ToString("yyyy-MM-ddTHH:mm:sszzz")" />
+                            <input id="NewEvidence_CollectedAt" name="CollectedAt" type="datetime-local" step="60" value="@FormatDateTimeLocal(Model.NewEvidence.CollectedAt)" autocomplete="off" />
                         </div>
                         <div class="field field-wide">
                             <label asp-for="NewEvidence.Description"></label>
