@@ -37,6 +37,35 @@
         </div>
         <button class="button analytics-custom-apply" type="submit" data-analytics-custom-apply hidden="@(Model.SelectedRange != "custom")">Apply</button>
     </form>
+    @{
+        var trendBuckets = Model.CreatedOverTime;
+        var trendLabelInterval = GetTrendLabelInterval(trendBuckets.Count);
+    }
+    <div class="analytics-heading-trend" aria-label="Case intake trend">
+        @if (!trendBuckets.Any(item => item.Count > 0))
+        {
+            <p class="empty-state">No cases opened in this range.</p>
+        }
+        else
+        {
+            <div class="intake-trend-chart" role="img" aria-label="Case intake count by time bucket">
+                <div class="intake-trend-grid" aria-hidden="true"></div>
+                <div class="intake-trend-bars">
+                    @for (var bucketIndex = 0; bucketIndex < trendBuckets.Count; bucketIndex++)
+                    {
+                        var item = trendBuckets[bucketIndex];
+                        var title = $"{item.Label}: {item.Count} {(item.Count == 1 ? "case" : "cases")}";
+                        var showLabel = ShouldShowTrendLabel(bucketIndex, trendBuckets.Count, trendLabelInterval);
+                        <span class="intake-trend-bucket" title="@title" aria-label="@title">
+                            <span class="intake-trend-bar @item.ColorClass"
+                                  style="--trend-height: @item.BarPercent%; --bar-color: @item.Color;"></span>
+                            <span class="intake-trend-label @(showLabel ? string.Empty : "intake-trend-label-hidden")">@item.Label</span>
+                        </span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Model.ValidationMessage))
@@ -44,48 +73,10 @@
     <div class="notice" role="status">@Model.ValidationMessage</div>
 }
 
-<p class="muted analytics-range-label">@Model.RangeLabel</p>
-
 @if (!Model.HasCases)
 {
     <p class="empty-state">No cases found for this time range.</p>
 }
-
-<section class="panel intake-trend-panel" aria-label="Case intake trend">
-    @{
-        var trendBuckets = Model.CreatedOverTime;
-        var trendLabelInterval = GetTrendLabelInterval(trendBuckets.Count);
-    }
-    <div class="intake-trend-header">
-        <div>
-            <h2>Case Intake Trend</h2>
-            <p class="muted">Cases opened during each day or hour in the selected range.</p>
-        </div>
-    </div>
-    @if (!trendBuckets.Any(item => item.Count > 0))
-    {
-        <p class="empty-state">No cases opened in this range.</p>
-    }
-    else
-    {
-        <div class="intake-trend-chart" role="img" aria-label="Case intake count by time bucket">
-            <div class="intake-trend-grid" aria-hidden="true"></div>
-            <div class="intake-trend-bars">
-                @for (var bucketIndex = 0; bucketIndex < trendBuckets.Count; bucketIndex++)
-                {
-                    var item = trendBuckets[bucketIndex];
-                    var title = $"{item.Label}: {item.Count} {(item.Count == 1 ? "case" : "cases")}";
-                    var showLabel = ShouldShowTrendLabel(bucketIndex, trendBuckets.Count, trendLabelInterval);
-                    <span class="intake-trend-bucket" title="@title" aria-label="@title">
-                        <span class="intake-trend-bar @item.ColorClass"
-                              style="--trend-height: @item.BarPercent%; --bar-color: @item.Color;"></span>
-                        <span class="intake-trend-label @(showLabel ? string.Empty : "intake-trend-label-hidden")">@item.Label</span>
-                    </span>
-                }
-            </div>
-        </div>
-    }
-</section>
 
 <section class="metric-grid analytics-summary-grid" aria-label="Case analytics summary">
     <article class="metric metric-neutral">

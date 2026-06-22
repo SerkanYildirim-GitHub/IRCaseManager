@@ -221,12 +221,9 @@ textarea { resize: vertical; }
 .analytics-custom-date-field[hidden] { display: none !important; }
 .analytics-custom-apply[hidden] { display: none !important; }
 .analytics-range-form input[type="date"] { min-width: 12.5rem; font-variant-numeric: tabular-nums; }
-.analytics-range-label { margin: 0 0 18px; font-weight: 700; }
-.intake-trend-panel { display: grid; gap: 8px; margin-bottom: 18px; padding: 14px 16px; }
-.intake-trend-header { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
-.intake-trend-header h2 { margin: 0; font-size: 1rem; }
-.intake-trend-header .muted { margin: 3px 0 0; font-size: 0.82rem; }
-.intake-trend-chart { position: relative; height: 104px; padding: 8px 8px 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-strong); overflow: hidden; }
+.analytics-heading-trend { grid-column: 1 / -1; min-width: 0; padding-top: 14px; border-top: 1px solid var(--border); }
+.analytics-heading-trend .empty-state { padding: 18px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-strong); }
+.intake-trend-chart { position: relative; height: 98px; padding: 8px 8px 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-strong); overflow: hidden; }
 .intake-trend-chart::after { content: ""; position: absolute; right: 8px; bottom: 23px; left: 8px; height: 1px; background: color-mix(in srgb, var(--muted) 40%, transparent); }
 .intake-trend-grid { position: absolute; top: 8px; right: 8px; bottom: 23px; left: 8px; background-image: linear-gradient(to top, color-mix(in srgb, var(--border) 62%, transparent) 1px, transparent 1px); background-size: 100% 25%; opacity: 0.42; }
 .intake-trend-bars { position: relative; z-index: 1; display: flex; align-items: stretch; gap: 3px; height: 100%; }
