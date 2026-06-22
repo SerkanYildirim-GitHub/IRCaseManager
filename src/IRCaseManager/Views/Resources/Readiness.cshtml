@@ -1,6 +1,6 @@
 @model IRCaseManager.ViewModels.ReadinessViewModel
 @{
-    ViewData["Title"] = "IR Readiness Check";
+    ViewData["Title"] = "IR Health Check";
     var overallPercent = Model.Overall.Percentage?.ToString() ?? "Not Started";
     var lastUpdated = Model.Overall.LastUpdatedAtUtc is null
         ? null
