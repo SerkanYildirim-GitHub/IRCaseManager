@@ -189,3 +189,154 @@
   rangeSelect.addEventListener("change", syncCustomDateFields);
   syncCustomDateFields();
 })();
+
+(function () {
+  const modal = document.querySelector("[data-analytics-chart-modal]");
+  if (!modal) {
+    return;
+  }
+
+  const modalDialog = modal.querySelector(".analytics-modal-dialog");
+  const modalTitle = modal.querySelector("[data-analytics-modal-title]");
+  const modalDescription = modal.querySelector("[data-analytics-modal-description]");
+  const modalContent = modal.querySelector("[data-analytics-modal-content]");
+  let lastFocusedElement = null;
+
+  function getSegmentElements(scope, key) {
+    return Array.from(scope.querySelectorAll("[data-segment-key]")).filter(function (element) {
+      return element.dataset.segmentKey === key;
+    });
+  }
+
+  function setSegmentState(element, className, enabled) {
+    const scope = element.closest("[data-analytics-chart-scope]");
+    const key = element.dataset.segmentKey;
+    if (!scope || !key) {
+      return;
+    }
+
+    getSegmentElements(scope, key).forEach(function (match) {
+      match.classList.toggle(className, enabled);
+    });
+  }
+
+  function toggleSegmentSelection(element) {
+    const scope = element.closest("[data-analytics-chart-scope]");
+    const key = element.dataset.segmentKey;
+    if (!scope || !key) {
+      return;
+    }
+
+    const wasSelected = element.classList.contains("is-selected");
+    Array.from(scope.querySelectorAll("[data-segment-key].is-selected")).forEach(function (match) {
+      match.classList.remove("is-selected");
+    });
+
+    if (!wasSelected) {
+      getSegmentElements(scope, key).forEach(function (match) {
+        match.classList.add("is-selected");
+      });
+    }
+  }
+
+  document.addEventListener("mouseover", function (event) {
+    const segment = event.target.closest("[data-segment-key]");
+    if (segment) {
+      setSegmentState(segment, "is-hovered", true);
+    }
+  });
+
+  document.addEventListener("mouseout", function (event) {
+    const segment = event.target.closest("[data-segment-key]");
+    if (segment) {
+      setSegmentState(segment, "is-hovered", false);
+    }
+  });
+
+  document.addEventListener("focusin", function (event) {
+    const segment = event.target.closest("[data-segment-key]");
+    if (segment) {
+      setSegmentState(segment, "is-hovered", true);
+    }
+  });
+
+  document.addEventListener("focusout", function (event) {
+    const segment = event.target.closest("[data-segment-key]");
+    if (segment) {
+      setSegmentState(segment, "is-hovered", false);
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    const segment = event.target.closest("[data-segment-key]");
+    if (segment) {
+      event.preventDefault();
+      toggleSegmentSelection(segment);
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    const segment = event.target.closest("[data-segment-key]");
+    if (segment && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      toggleSegmentSelection(segment);
+      return;
+    }
+
+    if (event.key === "Escape" && !modal.hidden) {
+      closeModal();
+    }
+  });
+
+  function openModal(card) {
+    const title = card.querySelector(".analytics-panel-header h2")?.textContent || "Chart";
+    const description = card.querySelector(".analytics-panel-header .muted")?.textContent || "";
+    const source = card.querySelector("[data-analytics-card-content]");
+    if (!source || !modalContent || !modalTitle || !modalDescription) {
+      return;
+    }
+
+    lastFocusedElement = document.activeElement;
+    modalTitle.textContent = title;
+    modalDescription.textContent = description;
+    modalContent.replaceChildren(source.cloneNode(true));
+    modal.hidden = false;
+    document.body.classList.add("has-analytics-modal");
+
+    const closeButton = modal.querySelector("[data-analytics-modal-close]");
+    if (closeButton) {
+      closeButton.focus();
+    } else if (modalDialog) {
+      modalDialog.focus();
+    }
+  }
+
+  function closeModal() {
+    if (modal.hidden) {
+      return;
+    }
+
+    modal.hidden = true;
+    document.body.classList.remove("has-analytics-modal");
+    if (modalContent) {
+      modalContent.replaceChildren();
+    }
+
+    if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+      lastFocusedElement.focus();
+    }
+  }
+
+  document.querySelectorAll("[data-analytics-expand-chart]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      const card = button.closest("[data-analytics-chart-card]");
+      if (card) {
+        openModal(card);
+      }
+    });
+  });
+
+  modal.querySelectorAll("[data-analytics-modal-close]").forEach(function (element) {
+    element.addEventListener("click", closeModal);
+  });
+})();

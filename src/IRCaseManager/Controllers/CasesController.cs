@@ -66,7 +66,7 @@ public class CasesController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> Analytics(string? range, string? from, string? to)
+    public async Task<IActionResult> Analytics(string? range, string? from, string? to, string? chart)
     {
         var selectedRange = BuildAnalyticsRange(range, from, to);
         var visibleCases = await caseAccessService
@@ -80,7 +80,7 @@ public class CasesController(
             .Where(irCase => irCase.OpenedAt >= selectedRange.StartUtc && irCase.OpenedAt < selectedRange.EndExclusiveUtc)
             .ToList();
 
-        var model = BuildAnalyticsViewModel(cases, selectedRange);
+        var model = BuildAnalyticsViewModel(cases, selectedRange, BuildAnalyticsChartMode(chart));
         return View(model);
     }
 
@@ -1054,7 +1054,13 @@ public class CasesController(
         string? ToInput,
         string? ValidationMessage);
 
-    private sealed record AnalyticsBreakdownSeed(string Label, int Count);
+    private sealed record AnalyticsBreakdownSeed(string Label, int Count, string Color, string ColorClass);
+
+    private static string BuildAnalyticsChartMode(string? chart)
+    {
+        var normalizedChart = string.IsNullOrWhiteSpace(chart) ? "donut" : chart.Trim().ToLowerInvariant();
+        return normalizedChart is "donut" or "bar" or "table" ? normalizedChart : "donut";
+    }
 
     private static AnalyticsRange BuildAnalyticsRange(string? range, string? from, string? to)
     {
@@ -1134,11 +1140,15 @@ public class CasesController(
             out date);
     }
 
-    private static CaseAnalyticsViewModel BuildAnalyticsViewModel(IReadOnlyList<Case> cases, AnalyticsRange range)
+    private static CaseAnalyticsViewModel BuildAnalyticsViewModel(
+        IReadOnlyList<Case> cases,
+        AnalyticsRange range,
+        string chartMode)
     {
         return new CaseAnalyticsViewModel
         {
             SelectedRange = range.Key,
+            ChartMode = chartMode,
             RangeLabel = range.Label,
             FromInput = range.FromInput,
             ToInput = range.ToInput,
@@ -1149,35 +1159,49 @@ public class CasesController(
             EscalatedCases = cases.Count(irCase => irCase.Status == CaseStatus.Escalated),
             CriticalCases = cases.Count(irCase => irCase.Severity == CaseSeverity.Critical),
             HighCases = cases.Count(irCase => irCase.Severity == CaseSeverity.High),
-            SeverityBreakdown = BuildBreakdown([
-                new("Critical", cases.Count(irCase => irCase.Severity == CaseSeverity.Critical)),
-                new("High", cases.Count(irCase => irCase.Severity == CaseSeverity.High)),
-                new("Medium", cases.Count(irCase => irCase.Severity == CaseSeverity.Medium)),
-                new("Low", cases.Count(irCase => irCase.Severity == CaseSeverity.Low))
-            ]),
-            StatusBreakdown = BuildBreakdown([
-                new("New", cases.Count(irCase => irCase.Status == CaseStatus.New)),
-                new("Assigned", cases.Count(irCase => irCase.Status == CaseStatus.Assigned)),
-                new("Escalated", cases.Count(irCase => irCase.Status == CaseStatus.Escalated)),
-                new("Waiting", cases.Count(irCase => irCase.Status == CaseStatus.Waiting)),
-                new("Closed", cases.Count(irCase => irCase.Status == CaseStatus.Closed))
-            ]),
-            CaseTypeBreakdown = BuildBreakdown(Enum.GetValues<CaseType>()
+            SeverityBreakdown = BuildBreakdownSection(
+                "Case Severity Distribution",
+                "Cases grouped by severity in the selected range.",
+                [
+                BuildSeed("Critical", cases.Count(irCase => irCase.Severity == CaseSeverity.Critical), "red"),
+                BuildSeed("High", cases.Count(irCase => irCase.Severity == CaseSeverity.High), "orange"),
+                BuildSeed("Medium", cases.Count(irCase => irCase.Severity == CaseSeverity.Medium), "amber"),
+                BuildSeed("Low", cases.Count(irCase => irCase.Severity == CaseSeverity.Low), "green")
+                ]),
+            StatusBreakdown = BuildBreakdownSection(
+                "Case Lifecycle Status",
+                "Cases grouped by current workflow status.",
+                [
+                BuildSeed("New", cases.Count(irCase => irCase.Status == CaseStatus.New), "blue"),
+                BuildSeed("Assigned", cases.Count(irCase => irCase.Status == CaseStatus.Assigned), "purple"),
+                BuildSeed("Escalated", cases.Count(irCase => irCase.Status == CaseStatus.Escalated), "red"),
+                BuildSeed("Waiting", cases.Count(irCase => irCase.Status == CaseStatus.Waiting), "amber"),
+                BuildSeed("Closed", cases.Count(irCase => irCase.Status == CaseStatus.Closed), "green")
+                ]),
+            CaseTypeBreakdown = BuildBreakdownSection(
+                "Incident Type Distribution",
+                "Cases grouped by incident category.",
+                Enum.GetValues<CaseType>()
                 .Select(caseType => new AnalyticsBreakdownSeed(
                     caseType.GetDisplayName(),
-                    cases.Count(irCase => irCase.CaseType == caseType)))),
+                    cases.Count(irCase => irCase.CaseType == caseType),
+                    GetCaseTypeColor(caseType),
+                    GetCaseTypeColorClass(caseType)))),
             QueueBreakdown = BuildQueueBreakdown(cases),
-            LevelBreakdown = BuildBreakdown([
-                new("L1", cases.Count(irCase => GetAssignedLevel(irCase) == "L1")),
-                new("L2", cases.Count(irCase => GetAssignedLevel(irCase) == "L2")),
-                new("Admin", cases.Count(irCase => GetAssignedLevel(irCase) == "Admin")),
-                new("None", cases.Count(irCase => GetAssignedLevel(irCase) == "None"))
-            ]),
+            LevelBreakdown = BuildBreakdownSection(
+                "Workload by Response Level",
+                "Cases grouped by assigned response tier.",
+                [
+                BuildSeed("L1", cases.Count(irCase => GetAssignedLevel(irCase) == "L1"), "blue"),
+                BuildSeed("L2", cases.Count(irCase => GetAssignedLevel(irCase) == "L2"), "purple"),
+                BuildSeed("Admin", cases.Count(irCase => GetAssignedLevel(irCase) == "Admin"), "orange"),
+                BuildSeed("None", cases.Count(irCase => GetAssignedLevel(irCase) == "None"), "gray")
+                ]),
             CreatedOverTime = BuildCreatedOverTime(cases, range)
         };
     }
 
-    private static IReadOnlyList<AnalyticsBreakdownItem> BuildQueueBreakdown(IReadOnlyList<Case> cases)
+    private static AnalyticsBreakdownSection BuildQueueBreakdown(IReadOnlyList<Case> cases)
     {
         var knownQueues = new[] { IncidentResponseQueue, ItSupportQueue, AdminReviewQueue };
         var queueCounts = cases
@@ -1185,13 +1209,20 @@ public class CasesController(
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
 
         var seeds = knownQueues
-            .Select(queue => new AnalyticsBreakdownSeed(queue, queueCounts.GetValueOrDefault(queue)))
+            .Select(queue => new AnalyticsBreakdownSeed(
+                queue,
+                queueCounts.GetValueOrDefault(queue),
+                GetQueueColor(queue),
+                GetQueueColorClass(queue)))
             .Concat(queueCounts
                 .Where(item => !knownQueues.Contains(item.Key, StringComparer.Ordinal))
                 .OrderBy(item => item.Key, StringComparer.Ordinal)
-                .Select(item => new AnalyticsBreakdownSeed(item.Key, item.Value)));
+                .Select(item => BuildSeed(item.Key, item.Value, "gray")));
 
-        return BuildBreakdown(seeds);
+        return BuildBreakdownSection(
+            "Workload by Queue",
+            "Cases grouped by current handling queue.",
+            seeds);
     }
 
     private static IReadOnlyList<AnalyticsBreakdownItem> BuildCreatedOverTime(IReadOnlyList<Case> cases, AnalyticsRange range)
@@ -1210,12 +1241,13 @@ public class CasesController(
             for (var bucketStart = firstBucket; bucketStart < range.EndExclusiveUtc; bucketStart = bucketStart.AddHours(1))
             {
                 var bucketEnd = bucketStart.AddHours(1);
-                buckets.Add(new AnalyticsBreakdownSeed(
-                    bucketStart.ToLocalTime().ToString("MMM d HH:00", CultureInfo.InvariantCulture),
-                    cases.Count(irCase => irCase.OpenedAt >= bucketStart && irCase.OpenedAt < bucketEnd)));
+                buckets.Add(BuildSeed(
+                    bucketStart.ToLocalTime().ToString("HH:00", CultureInfo.InvariantCulture),
+                    cases.Count(irCase => irCase.OpenedAt >= bucketStart && irCase.OpenedAt < bucketEnd),
+                    "blue"));
             }
 
-            return BuildBreakdown(buckets);
+            return BuildTrendBreakdown(buckets);
         }
 
         var startDate = DateOnly.FromDateTime(range.StartUtc.UtcDateTime);
@@ -1225,26 +1257,160 @@ public class CasesController(
         {
             var dayStart = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
             var dayEnd = dayStart.AddDays(1);
-            dayBuckets.Add(new AnalyticsBreakdownSeed(
-                day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                cases.Count(irCase => irCase.OpenedAt >= dayStart && irCase.OpenedAt < dayEnd)));
+            dayBuckets.Add(BuildSeed(
+                day.ToString("MM/dd", CultureInfo.InvariantCulture),
+                cases.Count(irCase => irCase.OpenedAt >= dayStart && irCase.OpenedAt < dayEnd),
+                "blue"));
         }
 
-        return BuildBreakdown(dayBuckets);
+        return BuildTrendBreakdown(dayBuckets);
     }
 
-    private static IReadOnlyList<AnalyticsBreakdownItem> BuildBreakdown(IEnumerable<AnalyticsBreakdownSeed> seeds)
+    private static AnalyticsBreakdownSection BuildBreakdownSection(
+        string title,
+        string description,
+        IEnumerable<AnalyticsBreakdownSeed> seeds)
     {
         var seedList = seeds.ToList();
+        var total = seedList.Sum(item => item.Count);
+        var items = new List<AnalyticsBreakdownItem>();
+        var segmentStart = 0.0;
+
+        foreach (var item in seedList)
+        {
+            var segmentLength = total == 0 ? 0 : item.Count * 100.0 / total;
+            items.Add(new AnalyticsBreakdownItem
+            {
+                Label = item.Label,
+                Count = item.Count,
+                Percent = total == 0 ? 0 : (int)Math.Round(item.Count * 100.0 / total),
+                BarPercent = total == 0 ? 0 : (int)Math.Round(item.Count * 100.0 / total),
+                SegmentStart = segmentStart.ToString("0.###", CultureInfo.InvariantCulture),
+                SegmentLength = segmentLength.ToString("0.###", CultureInfo.InvariantCulture),
+                Color = item.Color,
+                ColorClass = item.ColorClass
+            });
+            segmentStart += segmentLength;
+        }
+
+        return new AnalyticsBreakdownSection
+        {
+            Title = title,
+            Description = description,
+            Total = total,
+            DonutGradient = BuildDonutGradient(items, total),
+            Items = items
+        };
+    }
+
+    private static IReadOnlyList<AnalyticsBreakdownItem> BuildTrendBreakdown(IEnumerable<AnalyticsBreakdownSeed> seeds)
+    {
+        var seedList = seeds.ToList();
+        var total = seedList.Sum(item => item.Count);
         var maxCount = seedList.Count == 0 ? 0 : seedList.Max(item => item.Count);
         return seedList
             .Select(item => new AnalyticsBreakdownItem
             {
                 Label = item.Label,
                 Count = item.Count,
-                Percent = maxCount == 0 ? 0 : (int)Math.Round(item.Count * 100.0 / maxCount)
+                Percent = total == 0 ? 0 : (int)Math.Round(item.Count * 100.0 / total),
+                BarPercent = maxCount == 0 ? 0 : (int)Math.Round(item.Count * 100.0 / maxCount),
+                Color = item.Color,
+                ColorClass = item.ColorClass
             })
             .ToList();
+    }
+
+    private static string BuildDonutGradient(IReadOnlyList<AnalyticsBreakdownItem> items, int total)
+    {
+        if (total == 0)
+        {
+            return string.Empty;
+        }
+
+        var segments = new List<string>();
+        var start = 0.0;
+        foreach (var item in items.Where(item => item.Count > 0))
+        {
+            var end = start + (item.Count * 100.0 / total);
+            segments.Add(string.Create(
+                CultureInfo.InvariantCulture,
+                $"{item.Color} {start:0.##}% {end:0.##}%"));
+            start = end;
+        }
+
+        return $"conic-gradient({string.Join(", ", segments)})";
+    }
+
+    private static AnalyticsBreakdownSeed BuildSeed(string label, int count, string colorKey)
+    {
+        return new AnalyticsBreakdownSeed(label, count, GetAnalyticsColor(colorKey), $"analytics-color-{colorKey}");
+    }
+
+    private static string GetAnalyticsColor(string colorKey)
+    {
+        return colorKey switch
+        {
+            "red" => "#dc2626",
+            "orange" => "#ea580c",
+            "amber" => "#d97706",
+            "yellow" => "#ca8a04",
+            "green" => "#16a34a",
+            "blue" => "#2563eb",
+            "cyan" => "#0891b2",
+            "purple" => "#7c3aed",
+            "teal" => "#0d9488",
+            "indigo" => "#4f46e5",
+            _ => "#64748b"
+        };
+    }
+
+    private static string GetCaseTypeColor(CaseType caseType)
+    {
+        return GetAnalyticsColor(caseType switch
+        {
+            CaseType.AlertTriage => "blue",
+            CaseType.Malware => "red",
+            CaseType.Phishing => "orange",
+            CaseType.UnauthorizedAccess => "purple",
+            CaseType.DataExposure => "teal",
+            _ => "gray"
+        });
+    }
+
+    private static string GetCaseTypeColorClass(CaseType caseType)
+    {
+        return caseType switch
+        {
+            CaseType.AlertTriage => "analytics-color-blue",
+            CaseType.Malware => "analytics-color-red",
+            CaseType.Phishing => "analytics-color-orange",
+            CaseType.UnauthorizedAccess => "analytics-color-purple",
+            CaseType.DataExposure => "analytics-color-teal",
+            _ => "analytics-color-gray"
+        };
+    }
+
+    private static string GetQueueColor(string queue)
+    {
+        return GetAnalyticsColor(queue switch
+        {
+            IncidentResponseQueue => "blue",
+            ItSupportQueue => "cyan",
+            AdminReviewQueue => "orange",
+            _ => "gray"
+        });
+    }
+
+    private static string GetQueueColorClass(string queue)
+    {
+        return queue switch
+        {
+            IncidentResponseQueue => "analytics-color-blue",
+            ItSupportQueue => "analytics-color-cyan",
+            AdminReviewQueue => "analytics-color-orange",
+            _ => "analytics-color-gray"
+        };
     }
 
     private static string GetAssignedLevel(Case irCase)

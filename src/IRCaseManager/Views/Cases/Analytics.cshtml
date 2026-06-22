@@ -19,6 +19,14 @@
                 <option value="custom" selected="@(Model.SelectedRange == "custom")">Custom Range</option>
             </select>
         </div>
+        <div class="field">
+            <label for="analytics-chart">Chart</label>
+            <select id="analytics-chart" name="chart">
+                <option value="donut" selected="@(Model.ChartMode == "donut")">Donut</option>
+                <option value="bar" selected="@(Model.ChartMode == "bar")">Bar</option>
+                <option value="table" selected="@(Model.ChartMode == "table")">Table</option>
+            </select>
+        </div>
         <div class="field analytics-custom-date-field" data-analytics-custom-date-field hidden="@(Model.SelectedRange != "custom")">
             <label for="analytics-from">From</label>
             <input id="analytics-from" name="from" type="date" value="@Model.FromInput" />
@@ -42,6 +50,42 @@
 {
     <p class="empty-state">No cases found for this time range.</p>
 }
+
+<section class="panel intake-trend-panel" aria-label="Case intake trend">
+    @{
+        var trendBuckets = Model.CreatedOverTime;
+        var trendLabelInterval = GetTrendLabelInterval(trendBuckets.Count);
+    }
+    <div class="intake-trend-header">
+        <div>
+            <h2>Case Intake Trend</h2>
+            <p class="muted">Cases opened during each day or hour in the selected range.</p>
+        </div>
+    </div>
+    @if (!trendBuckets.Any(item => item.Count > 0))
+    {
+        <p class="empty-state">No cases opened in this range.</p>
+    }
+    else
+    {
+        <div class="intake-trend-chart" role="img" aria-label="Case intake count by time bucket">
+            <div class="intake-trend-grid" aria-hidden="true"></div>
+            <div class="intake-trend-bars">
+                @for (var bucketIndex = 0; bucketIndex < trendBuckets.Count; bucketIndex++)
+                {
+                    var item = trendBuckets[bucketIndex];
+                    var title = $"{item.Label}: {item.Count} {(item.Count == 1 ? "case" : "cases")}";
+                    var showLabel = ShouldShowTrendLabel(bucketIndex, trendBuckets.Count, trendLabelInterval);
+                    <span class="intake-trend-bucket" title="@title" aria-label="@title">
+                        <span class="intake-trend-bar @item.ColorClass"
+                              style="--trend-height: @item.BarPercent%; --bar-color: @item.Color;"></span>
+                        <span class="intake-trend-label @(showLabel ? string.Empty : "intake-trend-label-hidden")">@item.Label</span>
+                    </span>
+                }
+            </div>
+        </div>
+    }
+</section>
 
 <section class="metric-grid analytics-summary-grid" aria-label="Case analytics summary">
     <article class="metric metric-neutral">
@@ -71,111 +115,154 @@
 </section>
 
 <section class="analytics-grid">
-    <article class="panel analytics-panel">
-        <h2>Severity Breakdown</h2>
-        <div class="bar-list">
-            @foreach (var item in Model.SeverityBreakdown)
-            {
-                <div class="bar-row">
-                    <div class="bar-row-label">
-                        <span>@item.Label</span>
-                        <strong>@item.Count</strong>
-                    </div>
-                    <div class="bar-track" aria-hidden="true">
-                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
-                    </div>
+    @for (var breakdownIndex = 0; breakdownIndex < Model.BreakdownSections.Count; breakdownIndex++)
+    {
+        var breakdown = Model.BreakdownSections[breakdownIndex];
+        var chartId = $"analytics-chart-{breakdownIndex}";
+        <article class="panel analytics-panel" data-analytics-chart-card>
+            <div class="analytics-panel-header">
+                <div>
+                    <h2>@breakdown.Title</h2>
+                    <p class="muted">@breakdown.Description</p>
                 </div>
-            }
-        </div>
-    </article>
-
-    <article class="panel analytics-panel">
-        <h2>Status Breakdown</h2>
-        <div class="bar-list">
-            @foreach (var item in Model.StatusBreakdown)
-            {
-                <div class="bar-row">
-                    <div class="bar-row-label">
-                        <span>@item.Label</span>
-                        <strong>@item.Count</strong>
+                <button class="button button-secondary button-compact" type="button" data-analytics-expand-chart>View larger</button>
+            </div>
+            <div class="analytics-card-content" data-analytics-card-content data-analytics-chart-scope>
+                @if (!breakdown.HasData)
+                {
+                    <p class="empty-state">No cases found for this breakdown.</p>
+                }
+                else if (Model.ChartMode == "donut")
+                {
+                    <div class="analytics-donut-layout">
+                        <div class="donut-svg-wrap">
+                            <svg class="donut-svg" viewBox="0 0 100 100" role="img" aria-label="@breakdown.Title">
+                                <circle class="donut-base" cx="50" cy="50" r="40"></circle>
+                                @for (var itemIndex = 0; itemIndex < breakdown.Items.Count; itemIndex++)
+                                {
+                                    var item = breakdown.Items[itemIndex];
+                                    var segmentKey = $"{chartId}-{itemIndex}";
+                                    if (item.Count > 0)
+                                    {
+                                        <circle class="donut-segment @item.ColorClass"
+                                                cx="50"
+                                                cy="50"
+                                                r="40"
+                                                pathLength="100"
+                                                stroke-dasharray="@item.SegmentLength 100"
+                                                stroke-dashoffset="-@item.SegmentStart"
+                                                style="--segment-color: @item.Color;"
+                                                transform="rotate(-90 50 50)"
+                                                tabindex="0"
+                                                role="button"
+                                                data-segment-key="@segmentKey"
+                                                aria-label="@($"{item.Label}: {item.Count} cases, {item.Percent}%")"></circle>
+                                    }
+                                }
+                            </svg>
+                            <div class="donut-chart-inner">
+                                <strong>@breakdown.Total</strong>
+                                <span>Total</span>
+                            </div>
+                        </div>
+                        <div class="chart-legend">
+                            @for (var itemIndex = 0; itemIndex < breakdown.Items.Count; itemIndex++)
+                            {
+                                var item = breakdown.Items[itemIndex];
+                                var segmentKey = $"{chartId}-{itemIndex}";
+                                <button class="legend-row" type="button" data-segment-key="@segmentKey">
+                                    <span class="legend-swatch @item.ColorClass" style="--item-color: @item.Color;"></span>
+                                    <span>@item.Label</span>
+                                    <strong>@item.Count</strong>
+                                    <span>@item.Percent%</span>
+                                </button>
+                            }
+                        </div>
                     </div>
-                    <div class="bar-track" aria-hidden="true">
-                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
+                }
+                else if (Model.ChartMode == "bar")
+                {
+                    <div class="bar-list">
+                        @foreach (var item in breakdown.Items)
+                        {
+                            <div class="bar-row">
+                                <div class="bar-row-label">
+                                    <span>@item.Label</span>
+                                    <strong>@item.Count (@item.Percent%)</strong>
+                                </div>
+                                <div class="bar-track" aria-hidden="true">
+                                    <span class="bar-fill @item.ColorClass" style="--bar-percent: @item.BarPercent%; --bar-color: @item.Color;"></span>
+                                </div>
+                            </div>
+                        }
                     </div>
-                </div>
-            }
-        </div>
-    </article>
-
-    <article class="panel analytics-panel">
-        <h2>Case Type Breakdown</h2>
-        <div class="bar-list">
-            @foreach (var item in Model.CaseTypeBreakdown)
-            {
-                <div class="bar-row">
-                    <div class="bar-row-label">
-                        <span>@item.Label</span>
-                        <strong>@item.Count</strong>
-                    </div>
-                    <div class="bar-track" aria-hidden="true">
-                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
-                    </div>
-                </div>
-            }
-        </div>
-    </article>
-
-    <article class="panel analytics-panel">
-        <h2>Queue Breakdown</h2>
-        <div class="bar-list">
-            @foreach (var item in Model.QueueBreakdown)
-            {
-                <div class="bar-row">
-                    <div class="bar-row-label">
-                        <span>@item.Label</span>
-                        <strong>@item.Count</strong>
-                    </div>
-                    <div class="bar-track" aria-hidden="true">
-                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
-                    </div>
-                </div>
-            }
-        </div>
-    </article>
-
-    <article class="panel analytics-panel">
-        <h2>Level Breakdown</h2>
-        <div class="bar-list">
-            @foreach (var item in Model.LevelBreakdown)
-            {
-                <div class="bar-row">
-                    <div class="bar-row-label">
-                        <span>@item.Label</span>
-                        <strong>@item.Count</strong>
-                    </div>
-                    <div class="bar-track" aria-hidden="true">
-                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
-                    </div>
-                </div>
-            }
-        </div>
-    </article>
-
-    <article class="panel analytics-panel analytics-panel-wide">
-        <h2>Created Over Time</h2>
-        <div class="bar-list trend-list">
-            @foreach (var item in Model.CreatedOverTime)
-            {
-                <div class="bar-row">
-                    <div class="bar-row-label">
-                        <span>@item.Label</span>
-                        <strong>@item.Count</strong>
-                    </div>
-                    <div class="bar-track" aria-hidden="true">
-                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
-                    </div>
-                </div>
-            }
-        </div>
-    </article>
+                }
+                else
+                {
+                    <table class="analytics-table">
+                        <thead>
+                            <tr>
+                                <th>Label</th>
+                                <th>Count</th>
+                                <th>Percent</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in breakdown.Items)
+                            {
+                                <tr>
+                                    <td><span class="legend-swatch @item.ColorClass" style="--item-color: @item.Color;"></span>@item.Label</td>
+                                    <td>@item.Count</td>
+                                    <td>@item.Percent%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </article>
+    }
 </section>
+
+<div class="analytics-modal" data-analytics-chart-modal hidden>
+    <div class="analytics-modal-backdrop" data-analytics-modal-close></div>
+    <section class="analytics-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="analytics-modal-title" tabindex="-1">
+        <div class="analytics-modal-header">
+            <div>
+                <h2 id="analytics-modal-title" data-analytics-modal-title>Chart</h2>
+                <p class="muted" data-analytics-modal-description></p>
+            </div>
+            <button class="button button-secondary button-compact" type="button" data-analytics-modal-close>Close</button>
+        </div>
+        <div class="analytics-modal-content" data-analytics-modal-content></div>
+    </section>
+</div>
+
+@functions {
+    private static int GetTrendLabelInterval(int bucketCount)
+    {
+        if (bucketCount <= 8)
+        {
+            return 1;
+        }
+
+        if (bucketCount <= 24)
+        {
+            return 3;
+        }
+
+        if (bucketCount <= 31)
+        {
+            return 5;
+        }
+
+        return Math.Max(1, (int)Math.Ceiling(bucketCount / 6.0));
+    }
+
+    private static bool ShouldShowTrendLabel(int index, int bucketCount, int interval)
+    {
+        return index == 0 ||
+            index == bucketCount - 1 ||
+            (interval > 0 && index % interval == 0);
+    }
+}
