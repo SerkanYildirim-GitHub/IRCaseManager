@@ -4,6 +4,7 @@ using IRCaseManager.Models;
 using IRCaseManager.Security;
 using IRCaseManager.Services;
 using IRCaseManager.ViewModels;
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -37,6 +38,50 @@ public class CasesController(
             .ToList();
 
         return View(cases);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> MyCases()
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Challenge();
+        }
+
+        var visibleCaseSet = await caseAccessService
+            .FilterVisibleCases(db.Cases.AsNoTracking(), User)
+            .Where(irCase => irCase.Assignments.Any(assignment => assignment.ApplicationUserId == userId.Value))
+            .Include(irCase => irCase.CreatedBy)
+            .Include(irCase => irCase.Assignments)
+                .ThenInclude(assignment => assignment.ApplicationUser)
+                    .ThenInclude(applicationUser => applicationUser!.Role)
+            .ToListAsync();
+
+        var cases = visibleCaseSet
+            .OrderByDescending(irCase => irCase.OpenedAt)
+            .ToList();
+
+        return View(cases);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Analytics(string? range, string? from, string? to)
+    {
+        var selectedRange = BuildAnalyticsRange(range, from, to);
+        var visibleCases = await caseAccessService
+            .FilterVisibleCases(db.Cases.AsNoTracking(), User)
+            .Include(irCase => irCase.Assignments)
+                .ThenInclude(assignment => assignment.ApplicationUser)
+                    .ThenInclude(applicationUser => applicationUser!.Role)
+            .ToListAsync();
+
+        var cases = visibleCases
+            .Where(irCase => irCase.OpenedAt >= selectedRange.StartUtc && irCase.OpenedAt < selectedRange.EndExclusiveUtc)
+            .ToList();
+
+        var model = BuildAnalyticsViewModel(cases, selectedRange);
+        return View(model);
     }
 
     [HttpGet]
@@ -997,6 +1042,223 @@ public class CasesController(
     private static string BuildMissingFieldsMessage(string prefix, IReadOnlyList<string> missingFields)
     {
         return $"{prefix}. Complete required investigation fields first: {string.Join(", ", missingFields)}.";
+    }
+
+    private sealed record AnalyticsRange(
+        string Key,
+        string Label,
+        DateTimeOffset StartUtc,
+        DateTimeOffset EndExclusiveUtc,
+        bool GroupByHour,
+        string? FromInput,
+        string? ToInput,
+        string? ValidationMessage);
+
+    private sealed record AnalyticsBreakdownSeed(string Label, int Count);
+
+    private static AnalyticsRange BuildAnalyticsRange(string? range, string? from, string? to)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var normalizedRange = string.IsNullOrWhiteSpace(range) ? "7d" : range.Trim().ToLowerInvariant();
+
+        return normalizedRange switch
+        {
+            "24h" => new AnalyticsRange(
+                "24h",
+                "Last 24 Hours",
+                now.AddHours(-24),
+                now,
+                GroupByHour: true,
+                FromInput: null,
+                ToInput: null,
+                ValidationMessage: null),
+            "30d" => new AnalyticsRange(
+                "30d",
+                "Last 30 Days",
+                now.AddDays(-30),
+                now,
+                GroupByHour: false,
+                FromInput: null,
+                ToInput: null,
+                ValidationMessage: null),
+            "custom" => BuildCustomAnalyticsRange(from, to, now),
+            _ => new AnalyticsRange(
+                "7d",
+                "Last 7 Days",
+                now.AddDays(-7),
+                now,
+                GroupByHour: false,
+                FromInput: null,
+                ToInput: null,
+                ValidationMessage: normalizedRange == "7d" ? null : "Invalid range. Showing Last 7 Days.")
+        };
+    }
+
+    private static AnalyticsRange BuildCustomAnalyticsRange(string? from, string? to, DateTimeOffset now)
+    {
+        if (!TryParseAnalyticsDate(from, out var fromDate) ||
+            !TryParseAnalyticsDate(to, out var toDate) ||
+            toDate < fromDate)
+        {
+            return new AnalyticsRange(
+                "7d",
+                "Last 7 Days",
+                now.AddDays(-7),
+                now,
+                GroupByHour: false,
+                FromInput: from,
+                ToInput: to,
+                ValidationMessage: "Invalid custom range. Showing Last 7 Days.");
+        }
+
+        var startUtc = new DateTimeOffset(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        var endExclusiveUtc = new DateTimeOffset(toDate.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        return new AnalyticsRange(
+            "custom",
+            $"Custom Range: {fromDate:yyyy-MM-dd} to {toDate:yyyy-MM-dd}",
+            startUtc,
+            endExclusiveUtc,
+            GroupByHour: false,
+            FromInput: fromDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ToInput: toDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ValidationMessage: null);
+    }
+
+    private static bool TryParseAnalyticsDate(string? value, out DateOnly date)
+    {
+        return DateOnly.TryParseExact(
+            value,
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out date);
+    }
+
+    private static CaseAnalyticsViewModel BuildAnalyticsViewModel(IReadOnlyList<Case> cases, AnalyticsRange range)
+    {
+        return new CaseAnalyticsViewModel
+        {
+            SelectedRange = range.Key,
+            RangeLabel = range.Label,
+            FromInput = range.FromInput,
+            ToInput = range.ToInput,
+            ValidationMessage = range.ValidationMessage,
+            TotalCases = cases.Count,
+            OpenCases = cases.Count(irCase => irCase.Status != CaseStatus.Closed),
+            ClosedCases = cases.Count(irCase => irCase.Status == CaseStatus.Closed),
+            EscalatedCases = cases.Count(irCase => irCase.Status == CaseStatus.Escalated),
+            CriticalCases = cases.Count(irCase => irCase.Severity == CaseSeverity.Critical),
+            HighCases = cases.Count(irCase => irCase.Severity == CaseSeverity.High),
+            SeverityBreakdown = BuildBreakdown([
+                new("Critical", cases.Count(irCase => irCase.Severity == CaseSeverity.Critical)),
+                new("High", cases.Count(irCase => irCase.Severity == CaseSeverity.High)),
+                new("Medium", cases.Count(irCase => irCase.Severity == CaseSeverity.Medium)),
+                new("Low", cases.Count(irCase => irCase.Severity == CaseSeverity.Low))
+            ]),
+            StatusBreakdown = BuildBreakdown([
+                new("New", cases.Count(irCase => irCase.Status == CaseStatus.New)),
+                new("Assigned", cases.Count(irCase => irCase.Status == CaseStatus.Assigned)),
+                new("Escalated", cases.Count(irCase => irCase.Status == CaseStatus.Escalated)),
+                new("Waiting", cases.Count(irCase => irCase.Status == CaseStatus.Waiting)),
+                new("Closed", cases.Count(irCase => irCase.Status == CaseStatus.Closed))
+            ]),
+            CaseTypeBreakdown = BuildBreakdown(Enum.GetValues<CaseType>()
+                .Select(caseType => new AnalyticsBreakdownSeed(
+                    caseType.GetDisplayName(),
+                    cases.Count(irCase => irCase.CaseType == caseType)))),
+            QueueBreakdown = BuildQueueBreakdown(cases),
+            LevelBreakdown = BuildBreakdown([
+                new("L1", cases.Count(irCase => GetAssignedLevel(irCase) == "L1")),
+                new("L2", cases.Count(irCase => GetAssignedLevel(irCase) == "L2")),
+                new("Admin", cases.Count(irCase => GetAssignedLevel(irCase) == "Admin")),
+                new("None", cases.Count(irCase => GetAssignedLevel(irCase) == "None"))
+            ]),
+            CreatedOverTime = BuildCreatedOverTime(cases, range)
+        };
+    }
+
+    private static IReadOnlyList<AnalyticsBreakdownItem> BuildQueueBreakdown(IReadOnlyList<Case> cases)
+    {
+        var knownQueues = new[] { IncidentResponseQueue, ItSupportQueue, AdminReviewQueue };
+        var queueCounts = cases
+            .GroupBy(irCase => string.IsNullOrWhiteSpace(irCase.AssignedTeam) ? "Unspecified" : irCase.AssignedTeam)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+        var seeds = knownQueues
+            .Select(queue => new AnalyticsBreakdownSeed(queue, queueCounts.GetValueOrDefault(queue)))
+            .Concat(queueCounts
+                .Where(item => !knownQueues.Contains(item.Key, StringComparer.Ordinal))
+                .OrderBy(item => item.Key, StringComparer.Ordinal)
+                .Select(item => new AnalyticsBreakdownSeed(item.Key, item.Value)));
+
+        return BuildBreakdown(seeds);
+    }
+
+    private static IReadOnlyList<AnalyticsBreakdownItem> BuildCreatedOverTime(IReadOnlyList<Case> cases, AnalyticsRange range)
+    {
+        if (range.GroupByHour)
+        {
+            var firstBucket = new DateTimeOffset(
+                range.StartUtc.UtcDateTime.Year,
+                range.StartUtc.UtcDateTime.Month,
+                range.StartUtc.UtcDateTime.Day,
+                range.StartUtc.UtcDateTime.Hour,
+                0,
+                0,
+                TimeSpan.Zero);
+            var buckets = new List<AnalyticsBreakdownSeed>();
+            for (var bucketStart = firstBucket; bucketStart < range.EndExclusiveUtc; bucketStart = bucketStart.AddHours(1))
+            {
+                var bucketEnd = bucketStart.AddHours(1);
+                buckets.Add(new AnalyticsBreakdownSeed(
+                    bucketStart.ToLocalTime().ToString("MMM d HH:00", CultureInfo.InvariantCulture),
+                    cases.Count(irCase => irCase.OpenedAt >= bucketStart && irCase.OpenedAt < bucketEnd)));
+            }
+
+            return BuildBreakdown(buckets);
+        }
+
+        var startDate = DateOnly.FromDateTime(range.StartUtc.UtcDateTime);
+        var endDate = DateOnly.FromDateTime(range.EndExclusiveUtc.AddTicks(-1).UtcDateTime);
+        var dayBuckets = new List<AnalyticsBreakdownSeed>();
+        for (var day = startDate; day <= endDate; day = day.AddDays(1))
+        {
+            var dayStart = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var dayEnd = dayStart.AddDays(1);
+            dayBuckets.Add(new AnalyticsBreakdownSeed(
+                day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                cases.Count(irCase => irCase.OpenedAt >= dayStart && irCase.OpenedAt < dayEnd)));
+        }
+
+        return BuildBreakdown(dayBuckets);
+    }
+
+    private static IReadOnlyList<AnalyticsBreakdownItem> BuildBreakdown(IEnumerable<AnalyticsBreakdownSeed> seeds)
+    {
+        var seedList = seeds.ToList();
+        var maxCount = seedList.Count == 0 ? 0 : seedList.Max(item => item.Count);
+        return seedList
+            .Select(item => new AnalyticsBreakdownItem
+            {
+                Label = item.Label,
+                Count = item.Count,
+                Percent = maxCount == 0 ? 0 : (int)Math.Round(item.Count * 100.0 / maxCount)
+            })
+            .ToList();
+    }
+
+    private static string GetAssignedLevel(Case irCase)
+    {
+        return irCase.Assignments
+            .OrderByDescending(assignment => assignment.AssignedAt)
+            .Select(assignment => assignment.ApplicationUser?.Role?.Name)
+            .FirstOrDefault(roleName => !string.IsNullOrWhiteSpace(roleName)) switch
+        {
+            RoleNames.AnalystLevel1 => "L1",
+            RoleNames.AnalystLevel2 => "L2",
+            RoleNames.Admin => "Admin",
+            _ => "None"
+        };
     }
 
     private async Task<IActionResult> UpdateCaseLifecycleAsync(

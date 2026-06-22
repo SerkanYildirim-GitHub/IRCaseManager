@@ -1,0 +1,181 @@
+@model IRCaseManager.ViewModels.CaseAnalyticsViewModel
+@{
+    ViewData["Title"] = "Case Analytics";
+}
+
+<section class="analytics-heading">
+    <div>
+        <p class="eyebrow">Metrics</p>
+        <h2>Case Analytics</h2>
+        <p class="muted">Case activity and distribution for the selected time range.</p>
+    </div>
+    <form class="analytics-range-form" asp-action="Analytics" method="get">
+        <div class="field">
+            <label for="analytics-range">Range</label>
+            <select id="analytics-range" name="range">
+                <option value="24h" selected="@(Model.SelectedRange == "24h")">Last 24 Hours</option>
+                <option value="7d" selected="@(Model.SelectedRange == "7d")">Last 7 Days</option>
+                <option value="30d" selected="@(Model.SelectedRange == "30d")">Last 30 Days</option>
+                <option value="custom" selected="@(Model.SelectedRange == "custom")">Custom Range</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="analytics-from">From</label>
+            <input id="analytics-from" name="from" type="date" value="@Model.FromInput" />
+        </div>
+        <div class="field">
+            <label for="analytics-to">To</label>
+            <input id="analytics-to" name="to" type="date" value="@Model.ToInput" />
+        </div>
+        <button class="button" type="submit">Apply</button>
+    </form>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.ValidationMessage))
+{
+    <div class="notice" role="status">@Model.ValidationMessage</div>
+}
+
+<p class="muted analytics-range-label">@Model.RangeLabel</p>
+
+@if (!Model.HasCases)
+{
+    <p class="empty-state">No cases found for this time range.</p>
+}
+
+<section class="metric-grid analytics-summary-grid" aria-label="Case analytics summary">
+    <article class="metric metric-neutral">
+        <span>Total cases</span>
+        <strong>@Model.TotalCases</strong>
+    </article>
+    <article class="metric status-assigned">
+        <span>Open cases</span>
+        <strong>@Model.OpenCases</strong>
+    </article>
+    <article class="metric status-closed">
+        <span>Closed cases</span>
+        <strong>@Model.ClosedCases</strong>
+    </article>
+    <article class="metric status-escalated">
+        <span>Escalated cases</span>
+        <strong>@Model.EscalatedCases</strong>
+    </article>
+    <article class="metric severity-critical">
+        <span>Critical cases</span>
+        <strong>@Model.CriticalCases</strong>
+    </article>
+    <article class="metric severity-high">
+        <span>High cases</span>
+        <strong>@Model.HighCases</strong>
+    </article>
+</section>
+
+<section class="analytics-grid">
+    <article class="panel analytics-panel">
+        <h2>Severity Breakdown</h2>
+        <div class="bar-list">
+            @foreach (var item in Model.SeverityBreakdown)
+            {
+                <div class="bar-row">
+                    <div class="bar-row-label">
+                        <span>@item.Label</span>
+                        <strong>@item.Count</strong>
+                    </div>
+                    <div class="bar-track" aria-hidden="true">
+                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
+                    </div>
+                </div>
+            }
+        </div>
+    </article>
+
+    <article class="panel analytics-panel">
+        <h2>Status Breakdown</h2>
+        <div class="bar-list">
+            @foreach (var item in Model.StatusBreakdown)
+            {
+                <div class="bar-row">
+                    <div class="bar-row-label">
+                        <span>@item.Label</span>
+                        <strong>@item.Count</strong>
+                    </div>
+                    <div class="bar-track" aria-hidden="true">
+                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
+                    </div>
+                </div>
+            }
+        </div>
+    </article>
+
+    <article class="panel analytics-panel">
+        <h2>Case Type Breakdown</h2>
+        <div class="bar-list">
+            @foreach (var item in Model.CaseTypeBreakdown)
+            {
+                <div class="bar-row">
+                    <div class="bar-row-label">
+                        <span>@item.Label</span>
+                        <strong>@item.Count</strong>
+                    </div>
+                    <div class="bar-track" aria-hidden="true">
+                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
+                    </div>
+                </div>
+            }
+        </div>
+    </article>
+
+    <article class="panel analytics-panel">
+        <h2>Queue Breakdown</h2>
+        <div class="bar-list">
+            @foreach (var item in Model.QueueBreakdown)
+            {
+                <div class="bar-row">
+                    <div class="bar-row-label">
+                        <span>@item.Label</span>
+                        <strong>@item.Count</strong>
+                    </div>
+                    <div class="bar-track" aria-hidden="true">
+                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
+                    </div>
+                </div>
+            }
+        </div>
+    </article>
+
+    <article class="panel analytics-panel">
+        <h2>Level Breakdown</h2>
+        <div class="bar-list">
+            @foreach (var item in Model.LevelBreakdown)
+            {
+                <div class="bar-row">
+                    <div class="bar-row-label">
+                        <span>@item.Label</span>
+                        <strong>@item.Count</strong>
+                    </div>
+                    <div class="bar-track" aria-hidden="true">
+                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
+                    </div>
+                </div>
+            }
+        </div>
+    </article>
+
+    <article class="panel analytics-panel analytics-panel-wide">
+        <h2>Created Over Time</h2>
+        <div class="bar-list trend-list">
+            @foreach (var item in Model.CreatedOverTime)
+            {
+                <div class="bar-row">
+                    <div class="bar-row-label">
+                        <span>@item.Label</span>
+                        <strong>@item.Count</strong>
+                    </div>
+                    <div class="bar-track" aria-hidden="true">
+                        <span class="bar-fill" style="--bar-percent: @item.Percent%;"></span>
+                    </div>
+                </div>
+            }
+        </div>
+    </article>
+</section>

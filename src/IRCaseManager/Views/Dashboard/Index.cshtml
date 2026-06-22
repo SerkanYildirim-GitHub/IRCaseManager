@@ -24,8 +24,8 @@
         <span>Informational</span>
         <strong>@ViewBag.InformationalCases</strong>
     </article>
-    <article class="metric metric-neutral metric-total">
-        <span>Total</span>
+    <a class="metric metric-neutral metric-total metric-link" asp-controller="Cases" asp-action="Analytics" aria-label="Open case analytics">
+        <span>Total Cases</span>
         <div class="metric-total-body">
             <strong>@ViewBag.TotalCases</strong>
             <div class="metric-breakdown" aria-label="Status breakdown">
@@ -35,7 +35,7 @@
                 <span>Closed</span><strong>@ViewBag.ClosedCases</strong>
             </div>
         </div>
-    </article>
+    </a>
 </section>
 
 <section class="panel">
