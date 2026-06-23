@@ -292,13 +292,13 @@ textarea { resize: vertical; }
 .analytics-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .analytics-panel-header .muted { margin: 4px 0 0; }
 .analytics-panel-wide { grid-column: 1 / -1; }
-.analytics-donut-layout { display: grid; grid-template-columns: minmax(132px, 180px) minmax(0, 1fr); align-items: center; gap: 18px; }
-.donut-svg-wrap { position: relative; display: grid; place-items: center; width: min(180px, 100%); aspect-ratio: 1; }
+.analytics-donut-layout { display: grid; grid-template-columns: minmax(132px, 190px) minmax(0, 1fr); align-items: center; gap: 18px; }
+.donut-svg-wrap { position: relative; display: grid; place-items: center; width: 190px; max-width: 100%; aspect-ratio: 1; }
 .donut-svg { width: 100%; height: 100%; overflow: visible; }
-.donut-base { fill: none; stroke: var(--surface-strong); stroke-width: 14; }
-.donut-segment { fill: none; stroke: var(--segment-color, var(--primary)); stroke-width: 14; stroke-linecap: butt; cursor: pointer; transition: opacity 120ms ease, stroke-width 120ms ease, filter 120ms ease; }
+.donut-base { fill: none; stroke: transparent; stroke-width: 14; }
+.donut-segment { fill: none; stroke: var(--segment-color, var(--primary)); stroke-width: 14; stroke-linecap: butt; cursor: pointer; opacity: 1; transition: opacity 120ms ease, stroke-width 120ms ease, filter 120ms ease; }
 .donut-segment:hover, .donut-segment:focus-visible, .donut-segment.is-hovered, .donut-segment.is-selected { opacity: 1; stroke-width: 17; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--segment-color, var(--primary)) 64%, transparent)); outline: none; }
-.donut-segment:not(:hover):not(:focus-visible):not(.is-hovered):not(.is-selected) { opacity: 0.9; }
+.donut-segment:not(:hover):not(:focus-visible):not(.is-hovered):not(.is-selected) { opacity: 1; }
 .donut-chart-inner { position: absolute; inset: 34%; z-index: 1; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); text-align: center; line-height: 1.1; pointer-events: none; }
 .donut-chart-inner strong { font-size: 1.7rem; }
 .donut-chart-inner span { color: var(--muted); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
