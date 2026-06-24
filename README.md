@@ -1,82 +1,102 @@
 # IR Case Manager
 
-## Goal
+IR Case Manager is an ASP.NET Core MVC application for managing # Cybersecurity Incident Response # cases.
 
-IR Case Manager is an early-stage incident response case management platform designed to help security teams create, assign, investigate, escalate, close, and review cybersecurity incident cases.
+The project was shaped by a practical problem from day-to-day security operations: manually documenting incidents in Word files, maintaining folders, building timelines, and keeping naming conventions consistent across investigations. Over time, that process became difficult to manage, harder to search, and harder to scale.
 
-The project is focused on a practical, security-first incident response workflow rather than general-purpose ticketing.
+IR Case Manager was created to bring more structure, consistency, and visibility to incident handling.
 
-## Current Status
+It is designed as a focused incident response case management tool rather than a general-purpose ticketing platform, with an emphasis on clear case ownership, investigation tracking, evidence-aware workflow, and readiness visibility.
 
-This is an MVP under active development and is not production-ready.
+## Purpose
 
-The current build focuses on secure case lifecycle handling, role-aware access, investigation workflow structure, and field-driven playbook progress.
+IR Case Manager reflects a security-focused and operations-driven mindset centered on:
 
-## What It Can Do Now
+- Structured incident documentation
+- Clear case ownership and handoff
+- Consistent investigation tracking
+- Organized case records and timelines
+- Evidence-aware investigation workflow
+- Readiness visibility and continuous improvement
 
-* Dashboard overview for case metrics
-* Create and track incident response cases
-* Auto-generate case IDs and case titles
-* Capture source references such as TK references
-* Assign cases by team and analyst
-* Enforce role-based and case-level access controls
-* Support secure case assignment and escalation handoff
-* Preserve assignment history for chain-of-custody visibility
-* Allow previous owners to retain view-only access after escalation
-* Restrict closed-case changes to authorized users
-* Provide Auditor read-only access to closed cases
-* Filter and review case records
-* Edit open case details with access controls
-* Capture structured investigation details, including:
+The long-term direction is to shape it into a practical solution that can help smaller or budget-conscious organizations improve how they document, manage, and review incident response activity.
 
-  * detection source
-  * alert/report time
-  * affected users
-  * affected assets
-  * involved apps or tools
-  * initial findings
-  * IOC summary
-  * containment actions
-  * escalation reason
-  * closure summary
-* Auto-complete playbook steps from investigation data
-* Block escalation until minimum investigation details are complete
-* Block closure until required containment and closure details are complete
-* Track evidence metadata
-* Provide quick resource links such as CISA KEV
-* Audit key authentication and case lifecycle activity
-* Apply failed-login tracking, account lockout, and login rate limiting
+## Current Capabilities
 
-## Incident Response Direction
+The current application supports:
 
-The investigation workspace and playbook structure are being aligned conceptually with:
+- Incident case creation and lifecycle tracking
+- Assignment, reassignment, and escalation workflow
+- Role-based case visibility
+- Investigation workspace for case activity, timeline, and analyst notes
+- Evidence metadata tracking
+- Playbook progress tracking
+- Dashboard visibility into case activity
+- Auditor read-only access to closed cases
+- IR Health Check for reviewing incident response readiness
 
-* NIST SP 800-61r3
-* NIST Cybersecurity Framework 2.0
-* CISA Cybersecurity Incident & Vulnerability Response Playbooks
-* CRR Incident Management guidance
+## IR Health Check
 
-The goal is to support a practical workflow across detection, analysis, containment, escalation, recovery, closure, and later reporting.
+IR Health Check helps review the current incident response readiness posture of a system, team, or organization across areas such as preparation, detection and analysis, containment and evidence, communications, notification and reporting, and post-incident review.
 
-## Coming Soon
-
-* Case activity timeline and investigation log
-* Improved evidence workflow
-* IOC tracking improvements
-* MITRE ATT&CK mapping
-* CISA KEV enrichment
-* Export and reporting features
-* Management metrics and audit review screens
-* Production database, migration, backup, and deployment hardening
-* Customer/company branding options
+Its readiness model treats unanswered items as unverified gaps, supporting a cautious Zero Trust-style view of readiness.
 
 ## Technology
 
-* ASP.NET Core MVC
-* SQLite
-* Entity Framework Core
-* Razor views
+- ASP.NET Core MVC
+- .NET 8
+- Razor Views
+- Entity Framework Core
+- SQLite for local development
+- Cookie-based authentication with application roles
 
-## Note
+## Authorization
 
-SQLite is currently used for development and MVP testing. Production use will require proper database migrations, backup planning, deployment hardening, and operational security review.
+The current role model includes:
+
+- Admin
+- Analyst L2
+- Analyst L1
+- Auditor
+
+Core authorization and lifecycle behavior are documented in:
+
+```text
+docs/AUTHORIZATION.md
+```
+
+That file should be treated as the source of truth before changing authorization, escalation flow, closure behavior, or Auditor access.
+
+## Build
+
+From the repository root:
+
+```powershell
+dotnet build .\src\IRCaseManager\IRCaseManager.csproj
+```
+
+## Current Status
+
+IR Case Manager is under active development and is currently being used as a focused project for workflow design, feature expansion, and practical incident response use-case development.
+
+Additional work is planned around security hardening, authentication strategy, deployment preparation, monitoring, backup planning, and operational review.
+
+## Roadmap
+
+Planned and future areas of focus include:
+
+- Expanded evidence management
+- Secure evidence file upload
+- MITRE ATT&CK mapping
+- Reporting and export
+- Playbook improvements
+- AI-assisted features to support analyst workflow and audit review
+- Security hardening
+- Deployment preparation
+- Active Directory authentication planning for VM lab use
+
+## Project Direction
+
+The goal is to build a practical incident response case management tool that improves structure, consistency, and visibility during cybersecurity investigations.
+
+The project is being developed incrementally, with priority on useful workflow first and production hardening later.
