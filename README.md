@@ -1,6 +1,6 @@
 # IR Case Manager
 
-IR Case Manager is an ASP.NET Core MVC application for managing # Cybersecurity Incident Response # cases.
+IR Case Manager is an ASP.NET Core MVC application for managing <b> Cybersecurity Incident Response</b># cases.
 
 The project was shaped by a practical problem from day-to-day security operations: manually documenting incidents in Word files, maintaining folders, building timelines, and keeping naming conventions consistent across investigations. Over time, that process became difficult to manage, harder to search, and harder to scale.
 
