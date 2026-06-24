@@ -1,6 +1,6 @@
 # IR Case Manager
 
-IR Case Manager is an ASP.NET Core MVC application for managing <b> Cybersecurity Incident Response</b># cases.
+IR Case Manager is an ASP.NET Core MVC application for managing <b> Cybersecurity Incident Response</b> cases.
 
 The project was shaped by a practical problem from day-to-day security operations: manually documenting incidents in Word files, maintaining folders, building timelines, and keeping naming conventions consistent across investigations. Over time, that process became difficult to manage, harder to search, and harder to scale.
 
@@ -37,8 +37,9 @@ The current application supports:
 
 ## IR Health Check
 
-IR Health Check helps review the current incident response readiness posture of a system, team, or organization across areas such as preparation, detection and analysis, containment and evidence, communications, notification and reporting, and post-incident review.
+IR Health Check helps review the current incident response readiness posture of a system, team, or organization across areas such as <b>preparation, detection and analysis, containment and evidence, communications, notification and reporting, and post-incident review<b/>.
 
+It is designed to support a structured, <b>NIST</b>-informed view of incident response readiness and maturity.
 Its readiness model treats unanswered items as unverified gaps, supporting a cautious Zero Trust-style view of readiness.
 
 ## Technology
