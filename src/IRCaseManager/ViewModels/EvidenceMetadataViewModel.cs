@@ -25,7 +25,7 @@ public class EvidenceMetadataViewModel
 
     [StringLength(2000)]
     [Display(Name = "Analyst notes / comments")]
-    public string AnalystNotes { get; set; } = string.Empty;
+    public string? AnalystNotes { get; set; }
 
     public void Trim()
     {

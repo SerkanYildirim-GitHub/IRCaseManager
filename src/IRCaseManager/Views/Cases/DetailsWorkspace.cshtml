@@ -252,7 +252,7 @@
                 <h2>Evidence Metadata</h2>
             </summary>
             <div class="workspace-section-body">
-            <p class="muted">File attachment will be added in a later secure upload slice.</p>
+            <p class="muted">File upload is not enabled in this MVP. Record evidence metadata, hashes, and storage references only.</p>
             @if (caseRecord.EvidenceItems.Count == 0)
             {
                 <p class="empty-state">No evidence metadata has been documented yet.</p>
@@ -290,15 +290,24 @@
                     <div class="form-grid">
                         <div class="field">
                             <label asp-for="NewEvidence.EvidenceType"></label>
-                            <input name="EvidenceType" value="@Model.NewEvidence.EvidenceType" maxlength="80" autocomplete="off" />
+                            <select id="NewEvidence_EvidenceType" name="EvidenceType">
+                                <option value="">Select one...</option>
+                                <option value="Screenshot" selected="@(Model.NewEvidence.EvidenceType == "Screenshot")">Screenshot</option>
+                                <option value="Log Export" selected="@(Model.NewEvidence.EvidenceType == "Log Export")">Log Export</option>
+                                <option value="Memory Acquisition" selected="@(Model.NewEvidence.EvidenceType == "Memory Acquisition")">Memory Acquisition</option>
+                                <option value="Email Artifact" selected="@(Model.NewEvidence.EvidenceType == "Email Artifact")">Email Artifact</option>
+                                <option value="Network Capture" selected="@(Model.NewEvidence.EvidenceType == "Network Capture")">Network Capture</option>
+                                <option value="Cloud Activity" selected="@(Model.NewEvidence.EvidenceType == "Cloud Activity")">Cloud Activity</option>
+                                <option value="Other / Generic" selected="@(Model.NewEvidence.EvidenceType == "Other / Generic")">Other / Generic</option>
+                            </select>
                         </div>
                         <div class="field">
                             <label asp-for="NewEvidence.Name"></label>
-                            <input name="Name" value="@Model.NewEvidence.Name" maxlength="160" autocomplete="off" />
+                            <input id="NewEvidence_Name" name="Name" value="@Model.NewEvidence.Name" maxlength="160" autocomplete="off" />
                         </div>
                         <div class="field">
                             <label asp-for="NewEvidence.Source"></label>
-                            <input name="Source" value="@Model.NewEvidence.Source" maxlength="256" autocomplete="off" />
+                            <input id="NewEvidence_Source" name="Source" value="@Model.NewEvidence.Source" maxlength="256" autocomplete="off" placeholder="e.g., Tool name, ticket ID, path, alert ID, or reference" />
                         </div>
                         <div class="field">
                             <label asp-for="NewEvidence.CollectedAt"></label>
@@ -308,9 +317,14 @@
                             <label asp-for="NewEvidence.Description"></label>
                             <textarea name="Description" maxlength="2000" rows="4">@Model.NewEvidence.Description</textarea>
                         </div>
-                        <div class="field field-wide">
-                            <label asp-for="NewEvidence.AnalystNotes"></label>
-                            <textarea name="AnalystNotes" maxlength="2000" rows="4">@Model.NewEvidence.AnalystNotes</textarea>
+                        <div class="field field-wide evidence-notes-control">
+                            <button class="button button-secondary button-compact evidence-notes-toggle" type="button" data-evidence-notes-toggle aria-expanded="false" aria-controls="evidence-notes-panel">
+                                @(string.IsNullOrWhiteSpace(Model.NewEvidence.AnalystNotes) ? "Add notes" : "Edit notes")
+                            </button>
+                            <div id="evidence-notes-panel" class="readiness-note-editor evidence-notes-panel" data-evidence-notes-panel hidden>
+                                <label asp-for="NewEvidence.AnalystNotes"></label>
+                                <textarea id="NewEvidence_AnalystNotes" name="AnalystNotes" maxlength="2000" rows="4">@Model.NewEvidence.AnalystNotes</textarea>
+                            </div>
                         </div>
                     </div>
                     <div class="form-actions">
@@ -492,6 +506,115 @@
                 });
             });
         })();
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const evidenceSection = document.querySelector("#evidence");
+            if (!evidenceSection) {
+                return;
+            }
+
+            const typeSelect = evidenceSection.querySelector("#NewEvidence_EvidenceType");
+            const nameInput = evidenceSection.querySelector("#NewEvidence_Name");
+            const sourceInput = evidenceSection.querySelector("#NewEvidence_Source");
+            const timeInput = evidenceSection.querySelector("#NewEvidence_CollectedAt");
+
+            if (!typeSelect || !nameInput || !timeInput) {
+                return;
+            }
+
+            const prefixMap = {
+                "Screenshot": "Screenshot_",
+                "Log Export": "LogExport_",
+                "Memory Acquisition": "MemAcq_",
+                "Email Artifact": "Email_",
+                "Network Capture": "NetCapture_",
+                "Cloud Activity": "Cloud_",
+                "Other / Generic": "Evidence_"
+            };
+
+            const sourcePlaceholderMap = {
+                "Screenshot": "e.g., Hostname, email subject, alert ID, or screenshot reference",
+                "Log Export": "e.g., File path, SIEM query ID, or log source name",
+                "Memory Acquisition": "e.g., Acquisition tool, host name, or evidence reference",
+                "Email Artifact": "e.g., Message-ID, sender address, or mailbox reference",
+                "Network Capture": "e.g., Firewall log ID, sensor name, or PCAP filename",
+                "Cloud Activity": "e.g., CloudTrail event ID, Azure sign-in log ID, or cloud resource",
+                "Other / Generic": "e.g., Reference URL, ticket ID, storage path, or location"
+            };
+
+            const defaultSourcePlaceholder = "e.g., Tool name, ticket ID, path, alert ID, or reference";
+            const pad = (value, length = 2) => String(value).padStart(length, "0");
+
+            function toLocalDateTimeInputValue(date) {
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+                    `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            }
+
+            function toCompactDateValue(date) {
+                return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+            }
+
+            function updateSourcePlaceholder() {
+                if (!sourceInput) {
+                    return;
+                }
+
+                sourceInput.placeholder = sourcePlaceholderMap[typeSelect.value] ?? defaultSourcePlaceholder;
+            }
+
+            typeSelect.addEventListener("change", () => {
+                updateSourcePlaceholder();
+
+                const prefix = prefixMap[typeSelect.value];
+                if (!prefix) {
+                    return;
+                }
+
+                const now = new Date();
+                const nextSequentialNumber = evidenceSection.querySelectorAll(".evidence-item").length + 1;
+
+                nameInput.value = `${prefix}${toCompactDateValue(now)}_${pad(nextSequentialNumber, 3)}`;
+                timeInput.value = toLocalDateTimeInputValue(now);
+                nameInput.focus();
+            });
+
+            updateSourcePlaceholder();
+        });
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const evidenceSection = document.querySelector("#evidence");
+            if (!evidenceSection) {
+                return;
+            }
+
+            const notesToggle = evidenceSection.querySelector("[data-evidence-notes-toggle]");
+            const notesPanel = evidenceSection.querySelector("[data-evidence-notes-panel]");
+            const notesTextarea = evidenceSection.querySelector("#NewEvidence_AnalystNotes");
+
+            if (!notesToggle || !notesPanel || !notesTextarea) {
+                return;
+            }
+
+            function updateNotesLabel() {
+                notesToggle.textContent = notesTextarea.value.trim() ? "Edit notes" : "Add notes";
+            }
+
+            notesToggle.addEventListener("click", () => {
+                const shouldOpen = notesPanel.hidden;
+                notesPanel.hidden = !shouldOpen;
+                notesToggle.setAttribute("aria-expanded", String(shouldOpen));
+
+                if (shouldOpen) {
+                    notesTextarea.focus();
+                }
+                else {
+                    updateNotesLabel();
+                }
+            });
+
+            notesTextarea.addEventListener("input", updateNotesLabel);
+            updateNotesLabel();
+        });
     </script>
 }
 

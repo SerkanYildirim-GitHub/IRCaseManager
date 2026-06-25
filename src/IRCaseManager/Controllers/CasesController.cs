@@ -753,7 +753,7 @@ public class CasesController(
             Name = model.Name,
             Description = model.Description,
             Source = model.Source,
-            AnalystNotes = model.AnalystNotes,
+            AnalystNotes = model.AnalystNotes ?? string.Empty,
             CollectedAt = model.CollectedAt!.Value.ToUniversalTime(),
             CollectedById = userId.Value
         };
