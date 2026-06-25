@@ -57,8 +57,8 @@
                     <h1>@ViewData["Title"]</h1>
                 </div>
                 <div class="user-actions">
-                    <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false">
-                        <span data-theme-label>Dark</span>
+                    <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+                        <span data-theme-icon aria-hidden="true">☾</span>
                     </button>
                     @if (User.Identity?.IsAuthenticated == true)
                     {

@@ -6,16 +6,18 @@
   const storageKey = "ir-case-manager-theme";
   const root = document.documentElement;
   const toggle = document.querySelector("[data-theme-toggle]");
-  const label = document.querySelector("[data-theme-label]");
+  const icon = document.querySelector("[data-theme-icon]");
 
   function applyTheme(theme) {
     root.dataset.theme = theme;
     if (toggle) {
       const isDark = theme === "dark";
+      const actionLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
       toggle.setAttribute("aria-pressed", String(isDark));
-      toggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
-      if (label) {
-        label.textContent = isDark ? "Dark" : "Light";
+      toggle.setAttribute("aria-label", actionLabel);
+      toggle.setAttribute("title", actionLabel);
+      if (icon) {
+        icon.textContent = isDark ? "☀" : "☾";
       }
     }
   }

@@ -173,8 +173,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .button, .theme-toggle, .link-button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--primary); border-radius: 8px; background: var(--primary); color: var(--primary-contrast); font: inherit; font-weight: 700; cursor: pointer; }
 .button:hover, .theme-toggle:hover, .link-button:hover { filter: brightness(0.96); text-decoration: none; }
 .button-secondary, .theme-toggle, .link-button { background: transparent; color: var(--primary); }
-.theme-toggle { min-height: 30px; padding: 0 10px; border-radius: 999px; font-size: 0.82rem; }
-.theme-toggle::before { content: ""; width: 12px; height: 12px; margin-right: 6px; border-radius: 999px; background: var(--primary); }
+.theme-toggle { width: 32px; min-width: 32px; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #facc15; font-size: 1.35rem; line-height: 1; box-shadow: none; transition: color 120ms ease, text-shadow 120ms ease, transform 120ms ease; }
+.theme-toggle:hover { filter: none; color: #fde047; text-shadow: 0 0 10px color-mix(in srgb, #facc15 64%, transparent); transform: scale(1.08); }
+.theme-toggle:focus-visible { outline: 2px solid color-mix(in srgb, #facc15 78%, transparent); outline-offset: 4px; filter: none; color: #fde047; text-shadow: 0 0 10px color-mix(in srgb, #facc15 64%, transparent); }
+.theme-toggle [data-theme-icon] { display: inline-flex; align-items: center; justify-content: center; width: 1em; height: 1em; }
 .link-button { min-height: auto; padding: 0; border: 0; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
